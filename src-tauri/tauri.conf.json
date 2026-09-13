@@ -37,6 +37,9 @@
       "nsis": {
         "installMode": "currentUser",
         "displayLanguageSelector": true
+      },
+      "msi": {
+        "languages": ["zh-CN"]
       }
     }
   }
