@@ -26,13 +26,14 @@ jobs:
       - name: Install frontend dependencies
         run: npm install
       - name: Diagnose Tauri project
+        continue-on-error: true
         run: |
           node --version
           npm --version
           rustc --version
           cargo --version
           npm run tauri info
-          cargo check --manifest-path src-tauri/Cargo.toml
+          cargo check --manifest-path src-tauri/Cargo.toml --message-format short
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
