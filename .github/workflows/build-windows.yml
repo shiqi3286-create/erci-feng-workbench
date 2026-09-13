@@ -47,6 +47,7 @@ jobs:
             $tail | Write-Output
             exit $code
           }
+      - name: Upload installers
         uses: actions/upload-artifact@v4
         with:
           name: erci-feng-workbench-windows
