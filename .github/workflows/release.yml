@@ -1,0 +1,40 @@
+name: Release Windows Desktop App
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable-x86_64-pc-windows-msvc
+      - name: Install dependencies
+        run: npm install
+      - name: Build and publish release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          projectPath: .
+          tauriScript: npm run tauri
+          tagName: ${{ github.ref_name }}
+          releaseName: 二次风工作台 ${{ github.ref_name }}
+          releaseBody: 自动构建的 Windows 安装包，请下载 exe 或 msi 文件。
+          releaseDraft: false
+          prerelease: false

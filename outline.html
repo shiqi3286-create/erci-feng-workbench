@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>晴笺 · AI 小说创作台 — 大纲</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='7' fill='%23E89B54'/%3E%3Cpath d='M12 5v14M5 12h14' stroke='white' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Quicksand:wght@500;600;700&family=Noto+Sans+SC:wght@400;500;700;900&display=swap">
+<link rel="stylesheet" href="assets/css/style.css">
+<style>
+  .outline-shell { display: grid; grid-template-columns: 250px 1fr 320px; gap: 18px; align-items: start; }
+  @media (max-width: 1100px) { .outline-shell { grid-template-columns: 220px 1fr; } .outline-detail { grid-column: 1 / -1; } }
+  @media (max-width: 800px) { .outline-shell { grid-template-columns: 1fr; } }
+  .beat-col { display: flex; flex-direction: column; gap: 10px; }
+</style>
+</head>
+<body data-page="outline">
+
+<header class="app-topbar" id="app-topbar"></header>
+
+<main class="page-wrap">
+  <div class="flex-between mb-14">
+    <h2 class="section-title"><span class="dot"></span>大纲 · 分卷管理 <span class="tag tag-mute" style="margin-left:6px">星落之森</span></h2>
+    <div class="flex gap-6">
+      <button class="btn btn-soft" id="btn-gen-vol">AI 生成大纲</button>
+      <button class="btn btn-ghost" id="btn-add-vol">＋ 分卷</button>
+    </div>
+  </div>
+
+  <div class="outline-shell">
+
+    <!-- 左：分卷列表 -->
+    <aside class="card card-pad" style="padding:12px">
+      <div class="eyebrow" style="padding:4px 8px 8px">分卷</div>
+      <div class="vol-list" id="vol-list"></div>
+    </aside>
+
+    <!-- 中：章节大纲卡片 -->
+    <section>
+      <div class="flex-between mb-14">
+        <div class="flex gap-10">
+          <span class="eyebrow" id="vol-title">—</span>
+          <span class="small muted" id="vol-stat">—</span>
+        </div>
+        <button class="btn btn-ghost btn-sm" id="btn-sort">⇅ 排序</button>
+      </div>
+      <div class="beat-col" id="beat-col"></div>
+    </section>
+
+    <!-- 右：卡片详情 -->
+    <aside class="outline-detail">
+      <div class="detail-pane" id="beat-detail"></div>
+    </aside>
+  </div>
+</main>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/common.js"></script>
+<script src="assets/js/store.js"></script>
+<script src="assets/js/ai.js"></script>
+<script src="assets/js/outline.js"></script>
+</body>
+</html>

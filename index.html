@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>晴笺 · AI 小说创作台 — 作品库</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='7' fill='%23E89B54'/%3E%3Cpath d='M12 5v14M5 12h14' stroke='white' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Quicksand:wght@500;600;700&family=Noto+Sans+SC:wght@400;500;700;900&display=swap">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body data-page="home">
+
+<header class="app-topbar" id="app-topbar"></header>
+
+<main class="page-wrap">
+
+  <!-- 欢迎横幅 -->
+  <section class="card card-pad" style="display:flex;align-items:center;gap:22px;padding:26px 30px;margin-bottom:26px;background:
+      radial-gradient(600px 200px at 90% 0%, rgba(246,217,180,.55), transparent 60%),
+      var(--paper);">
+    <div style="flex:1">
+      <p class="eyebrow" style="margin-bottom:6px">SUNNY WRITING STUDIO</p>
+      <h1 style="font-size:24px;margin-bottom:6px">下午好，阿晴 <span style="color:var(--sun)">☀</span></h1>
+      <p class="muted small">今天已经写了 <b class="mono" style="color:var(--ink)">1,842</b> 字 · 距今日目标还差 <b class="mono" style="color:var(--ink)">658</b> 字。要继续写《星落之森》吗？</p>
+      <div class="flex gap-6" style="margin-top:14px">
+        <a class="btn btn-primary" href="workspace.html">继续写作</a>
+        <button class="btn btn-ghost" onclick="APP.toast('新建项目向导（开发中）','')">＋ 新建项目</button>
+      </div>
+    </div>
+    <div class="hero-art" style="width:210px;border-radius:18px;overflow:hidden;box-shadow:var(--shadow-card);flex-shrink:0">
+      <img src="assets/img/cover-window.jpg" alt="写作插画" style="width:100%;aspect-ratio:16/10;object-fit:cover">
+    </div>
+  </section>
+
+  <!-- 项目统计条 -->
+  <section class="grid grid-4" style="margin-bottom:26px">
+    <div class="card card-pad" style="display:flex;align-items:center;gap:12px">
+      <div style="width:40px;height:40px;border-radius:13px;background:var(--sun-soft);color:var(--sun);display:grid;place-items:center">${''}</div>
+      <div><div class="eyebrow">作品</div><div class="display-num" style="font-size:20px" id="stat-books">3</div></div>
+    </div>
+    <div class="card card-pad" style="display:flex;align-items:center;gap:12px">
+      <div style="width:40px;height:40px;border-radius:13px;background:var(--peach-soft);color:#C46A50;display:grid;place-items:center"></div>
+      <div><div class="eyebrow">总字数</div><div class="display-num" style="font-size:20px" id="stat-words">61.5万</div></div>
+    </div>
+    <div class="card card-pad" style="display:flex;align-items:center;gap:12px">
+      <div style="width:40px;height:40px;border-radius:13px;background:var(--sky-soft);color:#4A7EA6;display:grid;place-items:center"></div>
+      <div><div class="eyebrow">章节</div><div class="display-num" style="font-size:20px" id="stat-chapters">120</div></div>
+    </div>
+    <div class="card card-pad" style="display:flex;align-items:center;gap:12px">
+      <div style="width:40px;height:40px;border-radius:13px;background:var(--lilac-soft);color:#7A63B3;display:grid;place-items:center"></div>
+      <div><div class="eyebrow">累计 AI 生成</div><div class="display-num" style="font-size:20px" id="stat-ai">26.3万</div></div>
+    </div>
+  </section>
+
+  <!-- 作品网格 -->
+  <div class="flex-between mb-14">
+    <h2 class="section-title"><span class="dot"></span>我的作品</h2>
+    <button class="btn btn-soft btn-sm" onclick="APP.toast('排序切换（开发中）','')">最近更新 ↓</button>
+  </div>
+  <section class="library-grid" id="library-grid"></section>
+
+</main>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/common.js"></script>
+<script src="assets/js/store.js"></script>
+<script src="assets/js/ai.js"></script>
+<script src="assets/js/index.js"></script>
+</body>
+</html>

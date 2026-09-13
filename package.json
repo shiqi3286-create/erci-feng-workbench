@@ -1,0 +1,15 @@
+{
+  "name": "erci-feng-workbench",
+  "version": "0.2.0",
+  "private": true,
+  "description": "二次风工作台：AI 小说创作与 Windows 桌面应用",
+  "scripts": {
+    "tauri": "tauri",
+    "dev": "tauri dev",
+    "build": "tauri build",
+    "check": "node --check assets/js/data.js && node --check assets/js/common.js && node --check assets/js/store.js && node --check assets/js/ai.js && node --check assets/js/index.js && node --check assets/js/workspace.js && node --check assets/js/outline.js && node --check assets/js/world.js && node --check assets/js/template.js"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.11.4"
+  }
+}

@@ -1,0 +1,18 @@
+[package]
+name = "erci-feng-workbench"
+version = "0.2.0"
+description = "二次风工作台 · AI 小说创作台"
+authors = ["shiqi3286-create"]
+edition = "2021"
+
+[lib]
+name = "erci_feng_workbench_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tauri = { version = "2", features = [] }
