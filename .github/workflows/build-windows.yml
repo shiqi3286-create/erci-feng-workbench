@@ -35,13 +35,18 @@ jobs:
           npm run tauri info
           cargo check --manifest-path src-tauri/Cargo.toml --message-format short
       - name: Build Tauri app
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          projectPath: .
-          tauriScript: npm run tauri
-      - name: Upload installers
+        shell: pwsh
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP "tauri-build.log"
+          & npm run tauri build 2>&1 | Tee-Object -FilePath $log
+          $code = $LASTEXITCODE
+          if ($code -ne 0) {
+            $tail = Get-Content $log | Select-Object -Last 120
+            "## Tauri build failure`n````text`n$($tail -join "`n")`n````" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+            Write-Output "===== Tauri build failure (last 120 lines) ====="
+            $tail | Write-Output
+            exit $code
+          }
         uses: actions/upload-artifact@v4
         with:
           name: erci-feng-workbench-windows
