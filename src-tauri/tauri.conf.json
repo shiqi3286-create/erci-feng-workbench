@@ -4,9 +4,9 @@
   "version": "0.2.0",
   "identifier": "com.erci-feng.workbench",
   "build": {
-    "frontendDist": "..",
-    "beforeDevCommand": "",
-    "beforeBuildCommand": ""
+    "frontendDist": "../dist",
+    "beforeDevCommand": "npm run prepare:web",
+    "beforeBuildCommand": "npm run prepare:web"
   },
   "app": {
     "windows": [
