@@ -6,3 +6,4 @@ src-tauri/gen/
 .env.*
 .DS_Store
 Thumbs.db
+/dist
