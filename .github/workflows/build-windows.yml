@@ -25,6 +25,14 @@ jobs:
           toolchain: stable-x86_64-pc-windows-msvc
       - name: Install frontend dependencies
         run: npm install
+      - name: Diagnose Tauri project
+        run: |
+          node --version
+          npm --version
+          rustc --version
+          cargo --version
+          npm run tauri info
+          cargo check --manifest-path src-tauri/Cargo.toml
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:
