@@ -21,6 +21,22 @@ fn write_json(path: &Path, value: &Value) -> Result<(), String> {
     fs::write(path, text).map_err(|e| e.to_string())
 }
 
+/* ---------- 全量存档（localStorage 的磁盘镜像） ---------- */
+
+#[tauri::command]
+pub fn save_store(app: AppHandle, data: String) -> Result<(), String> {
+    let path = app.path().app_data_dir().map_err(|e| e.to_string())?.join("store.json");
+    if let Some(parent) = path.parent() { fs::create_dir_all(parent).map_err(|e| e.to_string())?; }
+    fs::write(path, data).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn load_store(app: AppHandle) -> Result<String, String> {
+    let path = app.path().app_data_dir().map_err(|e| e.to_string())?.join("store.json");
+    if !path.exists() { return Ok(String::new()); }
+    fs::read_to_string(path).map_err(|e| e.to_string())
+}
+
 #[tauri::command]
 pub fn get_app_data_dir(app: AppHandle) -> Result<String, String> { Ok(data_root(&app)?.to_string_lossy().to_string()) }
 

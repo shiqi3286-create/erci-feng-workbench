@@ -190,7 +190,8 @@ novel-studio/
 ## 10. 迁移约定
 
 - UI 阶段：`assets/js/data.js` 提供首屏种子，`assets/js/store.js` 通过 `localStorage` 保存完整快照，字段与上述 schema 对齐；
-- 当前存储键：`novel-studio:data:v1`，包含项目、分卷、章节正文 `beat.paras`、设定、模板、API 与 AI 调用记录；
-- 业务代码统一调用 `APP.store`，不直接依赖 localStorage。未来封装 Windows/Tauri 时，只需将 `APP.store` 底层替换为 `read_chapter` / `write_chapter` 等文件命令；
+- 当前存储键：`novel-studio:data:v1`；项目级数据（分卷/人物/地点/物品/伏笔/时间线）按项目存放在 `DATA.projectData[projectId]`，`APP.store.useProject(pid)` 将当前项目的集合物化到顶层供页面读写，序列化时剔除顶层副本避免双份数据；
+- 桌面模式（Tauri）下 `save()` 防抖调用 `save_store` 命令把同一快照双写磁盘 `store.json`；本地缓存为空时 `init()` 通过 `load_store` 自动恢复，`onReady(cb)` 供页面在恢复后重渲染；
+- 业务代码统一调用 `APP.store`，不直接依赖 localStorage；
 - 正式磁盘阶段：按本规范建立 `data/<projectId>/` 下的 JSON / MD 文件，一章一个正文文件；
 - 索引（index.json）可随时重建，不作为唯一数据源。

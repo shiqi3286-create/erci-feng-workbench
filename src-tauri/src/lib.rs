@@ -7,6 +7,8 @@ pub fn run() {
     tauri::Builder::default()
         .invoke_handler(generate_handler![
             storage::get_app_data_dir,
+            storage::save_store,
+            storage::load_store,
             storage::list_projects,
             storage::load_project,
             storage::save_project,
