@@ -104,7 +104,7 @@ pub fn search_project(app: AppHandle, project_id: String, query: String) -> Resu
             if p.is_dir() { walk(&p, query, hits)?; }
             else if p.extension().and_then(|x| x.to_str()) == Some("md") {
                 let text = fs::read_to_string(&p).unwrap_or_default();
-                if text.to_lowercase().contains(&query.to_lowercase()) { hits.push(serde_json::json!({"path": p, "preview": text.chars().take(180).collect::<String>()})); }
+                if text.to_lowercase().contains(&query.to_lowercase()) { hits.push(serde_json::json!({"path": p.to_string_lossy().to_string(), "preview": text.chars().take(180).collect::<String>()})); }
             }
         }
         Ok(())
