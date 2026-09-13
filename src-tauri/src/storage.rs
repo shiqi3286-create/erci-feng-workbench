@@ -1,3 +1,4 @@
+use serde::Serialize;
 use serde_json::Value;
 use std::{fs, path::{Path, PathBuf}};
 use tauri::{AppHandle, Manager};
