@@ -38,7 +38,7 @@
         "installMode": "currentUser",
         "displayLanguageSelector": true
       },
-      "msi": {
+      "wix": {
         "languages": ["zh-CN"]
       }
     }
