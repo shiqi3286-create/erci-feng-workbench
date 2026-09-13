@@ -9,7 +9,7 @@ fn data_root(app: &AppHandle) -> Result<PathBuf, String> {
 }
 
 fn safe_id(id: &str) -> Result<&str, String> {
-    if id.is_empty() || id.contains(['/', '\\', ':']) || id == "." || id == ".." {
+    if id.is_empty() || id.chars().any(|c| matches!(c, '/' | '\\' | ':')) || id == "." || id == ".." {
         return Err("非法项目 ID".into());
     }
     Ok(id)
