@@ -1,4 +1,3 @@
-use serde::Serialize;
 use serde_json::Value;
 use std::{fs, path::{Path, PathBuf}};
 use tauri::{AppHandle, Manager};
@@ -21,9 +20,6 @@ fn write_json(path: &Path, value: &Value) -> Result<(), String> {
     let text = serde_json::to_string_pretty(value).map_err(|e| e.to_string())?;
     fs::write(path, text).map_err(|e| e.to_string())
 }
-
-#[derive(Debug, Serialize)]
-pub struct ProjectFile { pub id: String, pub project: Value }
 
 #[tauri::command]
 pub fn get_app_data_dir(app: AppHandle) -> Result<String, String> { Ok(data_root(&app)?.to_string_lossy().to_string()) }
