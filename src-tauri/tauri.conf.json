@@ -39,7 +39,7 @@
         "displayLanguageSelector": true
       },
       "wix": {
-        "languages": ["zh-CN"]
+        "language": ["zh-CN"]
       }
     }
   }
