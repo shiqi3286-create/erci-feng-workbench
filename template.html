@@ -55,12 +55,24 @@
       <span class="switch on" id="ai-switch"></span>
     </div>
   </div>
+
+  <div class="card card-pad mt-20" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
+    <div style="flex:1;min-width:220px">
+      <div class="eyebrow" style="margin-bottom:4px">版本与更新</div>
+      <div style="font-size:13px;color:var(--ink-soft)">当前版本 <b class="mono" id="app-version">…</b> · 检查到新版后跳转 GitHub 发布页手动下载安装。</div>
+    </div>
+    <div class="flex gap-6">
+      <button class="btn btn-ghost" id="btn-open-releases">发布页</button>
+      <button class="btn btn-soft" id="btn-check-update">检查更新</button>
+    </div>
+  </div>
 </main>
 
 <script src="assets/js/data.js"></script>
 <script src="assets/js/common.js"></script>
 <script src="assets/js/store.js"></script>
 <script src="assets/js/ai.js"></script>
+<script src="assets/js/updater.js"></script>
 <script src="assets/js/template.js"></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "二次风工作台",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "identifier": "com.erci-feng.workbench",
   "build": {
     "frontendDist": "../dist",
@@ -9,6 +9,7 @@
     "beforeBuildCommand": "npm run prepare:web"
   },
   "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
         "title": "二次风工作台 · AI 小说创作台",
@@ -27,12 +28,13 @@
   },
   "bundle": {
     "active": true,
-    "targets": [
-      "nsis",
-      "msi"
-    ],
+    "targets": ["nsis", "msi"],
     "icon": [
-      "icons/icon.ico"
+      "icons/icon.ico",
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.png"
     ],
     "createUpdaterArtifacts": false,
     "windows": {
@@ -41,12 +43,11 @@
       },
       "nsis": {
         "installMode": "currentUser",
-        "displayLanguageSelector": true
+        "displayLanguageSelector": true,
+        "languages": ["SimpChinese", "TradChinese", "English"]
       },
       "wix": {
-        "language": [
-          "zh-CN"
-        ]
+        "language": ["zh-CN"]
       }
     }
   }

@@ -252,6 +252,21 @@
     reader.readAsText(file, 'utf-8');
   });
 
+  /* ---------- 版本与更新 ---------- */
+  const verEl = document.getElementById('app-version');
+  if (verEl) {
+    APP.updater.currentVersion().then(v => { verEl.textContent = v ? 'v' + v : '浏览器预览'; });
+  }
+  const checkBtn = document.getElementById('btn-check-update');
+  if (checkBtn) {
+    checkBtn.addEventListener('click', () => {
+      checkBtn.textContent = '检查中…'; checkBtn.disabled = true;
+      APP.updater.check(true).finally(() => { checkBtn.textContent = '检查更新'; checkBtn.disabled = false; });
+    });
+  }
+  const relBtn = document.getElementById('btn-open-releases');
+  if (relBtn) relBtn.addEventListener('click', () => APP.updater.openReleases());
+
   /* ---------- 安全策略开关 ---------- */
   const sw = document.getElementById('ai-switch');
   sw.classList.toggle('on', !!D.user.aiAutoSend);

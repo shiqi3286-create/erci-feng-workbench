@@ -1,6 +1,6 @@
 # 开发文档 · 晴笺 AI 小说创作台
 
-> 版本 v0.3.0（章节级存储接入中） · 更新 2026-09-14
+> 版本 v0.4.0（托盘 / 图标 / 手动更新） · 更新 2026-09-14
 
 ## 1. 产品定位
 
@@ -56,6 +56,22 @@
 - 指令发送 → 更新 AI 轨迹状态 → 生成结果以 `.ai-mark` 段落追加到正文 → 字数 / token 预算联动更新。
 - 所有未实现按钮以 `APP.toast('xxx（开发中）','')` 占位，禁止出现无反馈的僵尸按钮。
 
+### 3.4 桌面集成（托盘 / 更新 / 安装器，v0.4.0）
+
+- **系统托盘**（`lib.rs` setup，`tray-icon` feature）：
+  - 左键单击切换主窗口显隐；右键菜单：显示主窗口 / 检查更新 / 退出；
+  - 关闭主窗口默认最小化到托盘（`CloseRequested` 被拦截），退出只走托盘菜单；
+  - 托盘图标复用 `bundle.icon` 的默认窗口图标。
+- **手动检查更新**（已决策不使用 tauri-plugin-updater 自动更新，避免签名密钥依赖）：
+  - 入口：模板·API 页「版本与更新」卡片 + 托盘菜单（Rust `emit('check-update')` → `updater.js` 监听）；
+  - 流程：`invoke('app_version')` 取运行版本 → 请求 GitHub `releases/latest` → 语义化版本比对 → 有新版弹确认并 `invoke('open_release_page')` 跳发布页；
+  - 浏览器模式：检查更新直接打开发布页；
+  - 相关命令：`app_version`、`open_release_page`（Windows 下 `cmd /c start` + CREATE_NO_WINDOW）。
+- **应用图标**：源图 `src-tauri/icons/app-icon-source.png`（画图模型生成，暖阳纸笔主题）；
+  由 `scripts/gen-icons.mjs`（纯 Node + 内置 zlib，零第三方依赖）生成多尺寸 `icon.ico`（16–256px，256 用 PNG 条目、其余 32bit BMP）与 PNG；
+  重新生成：`node scripts/gen-icons.mjs src-tauri/icons/app-icon-source.png src-tauri/icons`。
+- **安装向导中文化**：NSIS 显式 `languages: ["SimpChinese","TradChinese","English"]` + `displayLanguageSelector`；MSI（WiX）`language: ["zh-CN"]`。
+
 ## 4. 技术架构
 
 ```
@@ -64,8 +80,9 @@
 │  index / workspace / outline / world / template
 ├─────────────────────────────────────────────┤
 │  公共能力层                                  │
-│  common.js（图标 / Toast / Modal）            │
+│  common.js（图标 / Toast / Modal / 全局搜索）  │
 │  ai.js（OpenAI 兼容流式客户端 / 渠道切换）     │
+│  updater.js（手动检查更新 / 托盘事件监听）     │
 ├─────────────────────────────────────────────┤
 │  数据层                                      │
 │  data.js（示例种子） + store.js（存储适配接口） │
@@ -127,17 +144,19 @@
 - [x] P1 搜索：顶栏全局搜索（跨项目章节/人物/伏笔/地点/物品）、创作台左栏实时过滤
 - [x] P1 备份与导出：全量备份/恢复（JSON）、本章 TXT、全书 Markdown
 - [x] P2 Tauri 桌面工程与全量存档双写：`save_store` / `load_store` 兼容镜像
-- [ ] P2 章节级磁盘存储：当前章节 bundle 已接入，旧数据迁移、全项目逐章迁移与懒加载仍在完善
-- [x] P2 Windows 安装包：GitHub Actions 云端构建 + tag 自动发布（v0.3.0 已发布）
+- [ ] P2 章节级磁盘存储：当前章节 bundle 已接入（`.md` 正文 + `.json` 元数据），旧数据迁移、全项目逐章迁移与懒加载仍在完善
+- [x] P2 系统托盘：左键切换窗口显隐，右键菜单（显示/检查更新/退出），关闭最小化到托盘
+- [x] P2 应用图标：画图模型生成暖阳纸笔主题，多尺寸 ICO + PNG
+- [x] P2 安装向导中文化：NSIS 简中语言列表 + 语言选择器；MSI zh-CN
+- [x] P2 手动检查更新：GitHub Release 版本比对 + 跳转发布页下载（已决策不采用 tauri-plugin-updater 自动更新，避免签名密钥依赖）
+- [x] P2 Windows 安装包：GitHub Actions 云端构建 + tag 自动发布（v0.3.0 已发布，v0.4.0 待发）
 - [ ] P1 校验：单章人设校验 / 按卷全量扫描 / 伏笔回收统计
 - [ ] P1 API 配置优化：写作/画图渠道分离、拉取模型、测试模型、接口格式抽象 → 见 §11.1
 - [ ] P1 个人信息页（profile.html）：基础资料 / 统计 / 目标 / 偏好 / 数据安全 / 平台发布偏好 → 见 §11.3
 - [ ] P1 主页优化：搜索筛选、卡片增强、统计卡升级、空状态引导 → 见 §11.2
 - [ ] P1 主页问候与头图按时段适配（昵称读个人信息，不写死）→ 见 §11.4
 - [ ] P2 画图接入：创作台段落插图、设定库人物头像、画图提示词模板、图片本地存储 → 见 §11.1
-- [ ] P2 磁盘存储细化：按 DATA-SCHEMA 目录拆分章节文件（一章一 md + 索引）
 - [ ] P2 导出增强：EPUB / 平台排版
-- [ ] P2 自动更新：tauri-plugin-updater + 签名
 
 ## 9. 代码规范
 
@@ -160,6 +179,11 @@
 ## 11. 需求确认（2026-09-14 · 已对齐 · 待开发）
 
 以下需求已与用户逐条确认，尚未开始实现。开工前先读本节约定，实现后逐项勾除路线图对应条目。
+
+**已定决策**：
+
+- **更新方式**：采用「手动检查更新 + 跳发布页下载」，不引入 tauri-plugin-updater / 签名密钥（v0.4.0 已实现）；
+- **画图接口**：采用 OpenAI 兼容 `POST /v1/images/generations`（2026-09-14 与用户确认），SD-WebUI txt2img 暂不做；
 
 ### 11.1 API 配置优化（写作 / 画图分离）
 
@@ -197,3 +221,17 @@
   - 18:00–22:00 傍晚「晚上好」+ `cover-sunset.jpg`（落日）
   - 22:00–05:00 深夜「夜深了」+ `cover-window.jpg`（可加深色调，或后续用画图模型生成夜色主题图）
 - 顶部标语随时段切换：白天 `SUNNY WRITING STUDIO` / 夜间 `MOONLIT WRITING STUDIO`。
+
+## 12. 下一步计划（按优先级 · 2026-09-14）
+
+承接 v0.4.0（章节 bundle 存储 + 托盘 + 手动更新）之后的推进顺序：
+
+1. **P0 旧数据迁移 + 章节懒加载**：一次性把旧全量存档拆分为逐章 bundle 文件；启动只加载项目索引与当前章节，导出全书改按章节读取，落实「一章一文件、不全量进内存」。
+2. **P0 崩溃恢复与自动快照**：定时 + 退出前把当前章节写入 `.snap/`；异常退出后启动时提示恢复。
+3. **P1 本地规则校验闭环**：人物名/地名一致性扫描、伏笔出现与回收统计、名词统一（零 token 成本先上）；结果可采纳/忽略；之后再接按卷 AI 校验。
+4. **P1 AI 请求体验**：真实流式 `usage` 替换 token 估算、`AbortController` 取消与超时、`/v1/models` 拉取模型下拉、渠道「测试连接」。
+5. **P1 画图接入**（接口已定，见 §11.1）：渠道 `type: text/image` 分离与 `defaultImageApi` → 人物头像 / 段落插图 / 封面生成 → dataURL 兼容浏览器，Tauri 落盘。
+6. **P1 个人信息页 profile.html**：昵称/头像/签名、日更目标、写作统计；主页备份/恢复迁入、状态/题材筛选、时段问候（§11.2–11.4）。
+7. **P2 写作统计**：每日净增字数落库，周趋势与连续写作天数。
+8. **P2 EPUB / 平台排版导出**（番茄等格式规范）。
+9. **P2 自动更新（可选回补）**：如后续需要，再引入 tauri-plugin-updater + minisign 签名（需配置仓库 secret）。
