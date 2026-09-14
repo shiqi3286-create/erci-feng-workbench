@@ -12,7 +12,9 @@
   let aiRunning = false;
   let dirty = false;            // 是否有未保存改动
   let focusMode = false;
-
+  let chapterLoadSeq = 0;
+  let chapterSaveSeq = 0;
+  let chapterSaveTask = Promise.resolve();
   /* ================= 左栏：资源树 ================= */
   const sideTabs = ['outline', 'chars', 'fs', 'tpl'];
   const sideTitle = { outline: '大纲 · 小纲', chars: '人物设定', fs: '伏笔库', tpl: '提示词模板' };
@@ -121,9 +123,45 @@
     $('#cmd-input').focus();
   }
 
+  async function flushChapter() {
+    const beat = currentBeat();
+    const cur = D.current;
+    if (!beat || !cur || !cur.projectId || !cur.volumeId || !cur.chapterId) return true;
+    const seq = ++chapterSaveSeq;
+    const bundle = APP.store.chapterBundle(beat);
+    chapterSaveTask = chapterSaveTask.then(async () => {
+      if (seq !== chapterSaveSeq) return;
+      await APP.store.saveChapterBundle(cur.projectId, cur.volumeId, cur.chapterId, bundle);
+    });
+    try {
+      await chapterSaveTask;
+      return true;
+    } catch (e) {
+      APP.toast('章节文件保存失败：' + e.message, 'warn');
+      return false;
+    }
+  }
+
+  async function loadChapterBundleForCurrent() {
+    const cur = D.current;
+    if (!cur || !cur.projectId || !cur.volumeId || !cur.chapterId) return;
+    const seq = ++chapterLoadSeq;
+    try {
+      const bundle = await APP.store.loadChapterBundle(cur.projectId, cur.volumeId, cur.chapterId);
+      if (seq !== chapterLoadSeq || !bundle) return;
+      APP.store.applyChapterBundle(currentBeat(), bundle);
+      cur.chapterWords = (currentBeat()?.paras || []).reduce((s, x) => s + (x.text || '').length, 0);
+      renderDoc();
+      updateBudget();
+    } catch (e) {
+      APP.toast('章节文件读取失败，已使用本地缓存：' + e.message, 'warn');
+    }
+  }
+
   /* ================= 章节切换 ================= */
-  function switchChapter(volId, beatId) {
+  async function switchChapter(volId, beatId) {
     if (aiRunning) { APP.toast('AI 生成中，请稍候', 'warn'); return; }
+    if (dirty && !(await flushChapter())) return;
     const vol = D.volumes.find(v => v.id === volId);
     const beat = vol && vol.beats.find(b => b.id === beatId);
     if (!beat) return;
@@ -139,15 +177,15 @@
     APP.store.save();
     selectedPara = null;
     dirty = false;
-    renderSide(activeTab);
+    renderSide(activeTab, $('#side-search-input').value);
     renderDoc();
     renderCtx('beat');
     setSaveState(true);
     renderTrace();
-    /* 同步底部状态栏字数 / 修改次数 / 预算 */
     $('#st-words').textContent = (D.current.chapterWords || 0).toLocaleString();
     $('#st-mod').textContent = beat.modifiedCount || 0;
     updateBudget();
+    await loadChapterBundleForCurrent();
   }
 
   /* ================= 中栏：AI 轨迹 ================= */
@@ -303,20 +341,23 @@
       $('#save-state').lastChild.textContent = saved ? ' 已保存' : ' 未保存';
     }
   }
-  function saveNow(showToast = true) {
+  async function saveNow(showToast = true) {
     const beat = currentBeat();
-    if (!beat) return;
-    // 把内存中的 paras 写回 store
+    if (!beat) return true;
     const cur = D.current;
     APP.store.setChapterParas(cur.volumeId, cur.chapterId, beat.paras);
     beat.modifiedCount = (beat.modifiedCount || 0) + 1;
     cur.modifiedCount = beat.modifiedCount;
     $('#st-mod').textContent = beat.modifiedCount;
     APP.store.touchChapter(cur.volumeId, cur.chapterId, { modified: 0 });
-    setSaveState(true);
-    if (showToast) APP.toast('已保存到本地', 'success');
+    const ok = await flushChapter();
+    if (ok) {
+      setSaveState(true);
+      if (showToast) APP.toast('已保存到本地', 'success');
+    }
+    return ok;
   }
-  $('#btn-save').addEventListener('click', () => saveNow(true));
+  $('#btn-save').addEventListener('click', () => { saveNow(true); });
   // Ctrl+S
   document.addEventListener('keydown', e => {
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 's') { e.preventDefault(); saveNow(true); }
@@ -658,6 +699,7 @@
   $('#st-words').textContent = (D.current.chapterWords || 0).toLocaleString();
   $('#st-mod').textContent = D.current.modifiedCount || 0;
   updateBudget();
+  loadChapterBundleForCurrent();
 
   /* 桌面端磁盘恢复就绪后整体重渲染 */
   APP.store.onReady(() => {
@@ -667,6 +709,7 @@
     renderTrace();
     renderConflict();
     updateBudget();
+    loadChapterBundleForCurrent();
   });
 
   /* 来自设定库的「引用到写作区」 */

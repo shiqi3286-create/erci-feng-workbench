@@ -250,7 +250,71 @@ window.APP.store = (function () {
     save();
   }
 
-  /* ---------- 章节正文 ---------- */
+  /* ---------- 章节 bundle（浏览器兼容 + Tauri 章节文件） ---------- */
+  function chapterBundle(beat) {
+    const paras = (beat && beat.paras) || [];
+    return {
+      content: paras.map(p => p.text || '').join('\n\n'),
+      metadata: {
+        paragraphs: paras.map((p, index) => ({ index, cls: p.cls || '' })),
+        words: paras.reduce((s, p) => s + (p.text || '').length, 0),
+        modifiedCount: beat.modifiedCount || 0,
+        updatedAt: beat.updatedAt || new Date().toISOString(),
+        status: beat.status || 'todo',
+        snapshots: beat.snapshots || []
+      }
+    };
+  }
+  function applyChapterBundle(beat, bundle) {
+    if (!beat || !bundle) return beat;
+    const lines = String(bundle.content || '').split(/\n\s*\n/);
+    const meta = bundle.metadata || {};
+    const marks = Array.isArray(meta.paragraphs) ? meta.paragraphs : [];
+    beat.paras = lines.filter((x, i) => x.trim() || i < lines.length - 1).map((text, index) => ({
+      text: text.trim(), cls: (marks[index] && marks[index].cls) || ''
+    })).filter(p => p.text);
+    if (meta.modifiedCount !== undefined) beat.modifiedCount = meta.modifiedCount;
+    if (meta.updatedAt) beat.updatedAt = meta.updatedAt;
+    if (meta.status) beat.status = meta.status;
+    if (Array.isArray(meta.snapshots)) beat.snapshots = meta.snapshots;
+    return beat;
+  }
+  function browserBundleKey(projectId, volumeId, chapterId) {
+    return KEY + ':chapter:' + [projectId, volumeId, chapterId].map(x => String(x || '').replace(/[^\w-]/g, '_')).join(':');
+  }
+  async function loadChapterBundle(projectId, volumeId, chapterId) {
+    const beat = findBeat(volumeId, chapterId);
+    if (isDesktop()) {
+      try {
+        const bundle = await invoke('load_chapter_bundle', { projectId, volume: volumeId, chapter: chapterId });
+        if (bundle && beat && bundle.content !== undefined) { applyChapterBundle(beat, bundle); return bundle; }
+      } catch (e) { /* 文件尚不存在时回退内存数据 */ }
+    }
+    try {
+      const saved = localStorage.getItem(browserBundleKey(projectId, volumeId, chapterId));
+      if (saved) { const bundle = JSON.parse(saved); applyChapterBundle(beat, bundle); return bundle; }
+    } catch (e) { /* 损坏的章节缓存回退内存 */ }
+    return beat ? chapterBundle(beat) : null;
+  }
+  async function saveChapterBundle(projectId, volumeId, chapterId, bundle) {
+    if (isDesktop()) return invoke('save_chapter_bundle', { projectId, volume: volumeId, chapter: chapterId, content: bundle.content || '', metadata: bundle.metadata || {} });
+    localStorage.setItem(browserBundleKey(projectId, volumeId, chapterId), JSON.stringify(bundle));
+    return true;
+  }
+  async function createChapterSnapshot(projectId, volumeId, chapterId, bundle, snapshotId) {
+    if (isDesktop()) return invoke('create_snapshot', { projectId, volume: volumeId, chapter: chapterId, content: bundle.content || '', snapshotId });
+    const key = browserBundleKey(projectId, volumeId, chapterId) + ':snapshot:' + snapshotId;
+    localStorage.setItem(key, JSON.stringify(bundle));
+    return snapshotId;
+  }
+  async function restoreChapterSnapshot(projectId, volumeId, chapterId, snapshotId) {
+    if (isDesktop()) return invoke('restore_snapshot', { projectId, volume: volumeId, chapter: chapterId, snapshotId });
+    const key = browserBundleKey(projectId, volumeId, chapterId) + ':snapshot:' + snapshotId;
+    const saved = localStorage.getItem(key);
+    return saved ? JSON.parse(saved) : null;
+  }
+
+
   function setChapterParas(volumeId, beatId, paras) {
     const b = findBeat(volumeId, beatId);
     if (!b) return;
@@ -259,9 +323,7 @@ window.APP.store = (function () {
     if (_current() && _current().chapterId === beatId) _current().chapterWords = words;
     save();
   }
-  function saveChapter() {
-    save();
-  }
+  function saveChapter() { save(); }
   function confirmPara(volumeId, beatId, index) {
     const b = findBeat(volumeId, beatId);
     if (!b || !b.paras[index]) return;
@@ -426,6 +488,8 @@ window.APP.store = (function () {
     init, save,
     isDesktop, invoke, onReady,
     projectData, useProject, syncStats,
+    chapterBundle, applyChapterBundle, loadChapterBundle, saveChapterBundle,
+    createChapterSnapshot, restoreChapterSnapshot,
     currentVol, currentBeat, currentProject, findBeat,
     exportAll, restoreAll,
     addProject, removeProject,

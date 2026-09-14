@@ -1,7 +1,7 @@
 # 数据模型规范 · 晴笺 AI 小说创作台
 
 > 面向百万字长篇的本地存储结构。原则：**分文件存储、一章一正文、设定独立 JSON、元数据与正文分离**。
-> UI 骨架阶段的示例数据在 `assets/js/data.js`，字段与本规范保持一致，后续迁移为本地文件时按本规范落盘。
+> 当前 v0.3.0：浏览器使用 localStorage；Tauri 通过 `save_store/load_store` 保存全量兼容镜像，并通过章节 bundle 命令写入 `chapters/<volume>/<chapter>.md` 与同名 `.json` 元数据。后续再将设定、大纲、模板和 API 全部拆成独立文件。
 
 ## 1. 磁盘目录结构
 
@@ -120,23 +120,23 @@ novel-studio/
 
 ## 6. chapters/vol2/ch017.json（章节元数据，正文在 ch017.md）
 
+当前章节 bundle 由 Rust `save_chapter_bundle` 一次写入：`.md` 保存纯正文，`.json` 保存以下元数据；前端读取后还原为现有 `beat.paras[]`，不会丢失 AI 段落标记。
+
 ```jsonc
 {
-  "id": "ch-017",
-  "vol": "v2",
-  "no": 17,
-  "title": "灯火熄灭之后",
-  "beatId": "b2-4",
+  "paragraphs": [
+    { "index": 0, "cls": "" },
+    { "index": 1, "cls": "ai-mark" }
+  ],
   "words": 5230,
   "modifiedCount": 3,
   "updatedAt": "2026-09-13T15:47:00+08:00",
-  "aiGenerated": { "chars": 2140, "model": "deepseek-v3" },
-  "fsRefs": ["f4"],                                     // 本章相关伏笔
-  "newChars": ["c-old"],                                // 本章新出场人物（待确认）
-  "snapshots": ["ch017.snap/20260913-1547.json"],       // 快照指针（可回退）
-  "summary": "…本章摘要（自动生成，用于上下文组装）"
+  "status": "writing",
+  "snapshots": []
 }
 ```
+
+快照目录沿用 `chapters/vol2/ch017.snap/<snapshotId>.md`；后续会补充快照元数据 JSON 与索引。
 
 ## 7. ai/templates.json（提示词模板）
 

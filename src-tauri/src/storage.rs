@@ -15,10 +15,16 @@ fn safe_id(id: &str) -> Result<&str, String> {
     Ok(id)
 }
 
-fn write_json(path: &Path, value: &Value) -> Result<(), String> {
+fn atomic_write(path: &Path, bytes: &[u8]) -> Result<(), String> {
     if let Some(parent) = path.parent() { fs::create_dir_all(parent).map_err(|e| e.to_string())?; }
+    let tmp = path.with_extension(format!("{}tmp", path.extension().and_then(|x| x.to_str()).unwrap_or("")));
+    fs::write(&tmp, bytes).map_err(|e| e.to_string())?;
+    fs::rename(&tmp, path).map_err(|e| e.to_string())
+}
+
+fn write_json(path: &Path, value: &Value) -> Result<(), String> {
     let text = serde_json::to_string_pretty(value).map_err(|e| e.to_string())?;
-    fs::write(path, text).map_err(|e| e.to_string())
+    atomic_write(path, text.as_bytes())
 }
 
 /* ---------- 全量存档（localStorage 的磁盘镜像） ---------- */
@@ -84,19 +90,39 @@ pub fn load_chapter(app: AppHandle, project_id: String, volume: String, chapter:
 }
 
 #[tauri::command]
+pub fn load_chapter_bundle(app: AppHandle, project_id: String, volume: String, chapter: String) -> Result<Value, String> {
+    let id = safe_id(&project_id)?; let vol = safe_id(&volume)?; let ch = safe_id(&chapter)?;
+    let base = data_root(&app)?.join(id).join("chapters").join(vol);
+    let md = base.join(format!("{ch}.md"));
+    let meta = base.join(format!("{ch}.json"));
+    let content = if md.exists() { fs::read_to_string(md).map_err(|e| e.to_string())? } else { String::new() };
+    let metadata = if meta.exists() {
+        let text = fs::read_to_string(meta).map_err(|e| e.to_string())?;
+        serde_json::from_str::<Value>(&text).map_err(|e| e.to_string())?
+    } else { serde_json::json!({}) };
+    Ok(serde_json::json!({ "content": content, "metadata": metadata }))
+}
+
+#[tauri::command]
+pub fn save_chapter_bundle(app: AppHandle, project_id: String, volume: String, chapter: String, content: String, metadata: Value) -> Result<(), String> {
+    let id = safe_id(&project_id)?; let vol = safe_id(&volume)?; let ch = safe_id(&chapter)?;
+    let base = data_root(&app)?.join(id).join("chapters").join(vol);
+    atomic_write(&base.join(format!("{ch}.md")), content.as_bytes())?;
+    write_json(&base.join(format!("{ch}.json")), &metadata)
+}
+
+#[tauri::command]
 pub fn save_chapter(app: AppHandle, project_id: String, volume: String, chapter: String, content: String) -> Result<(), String> {
     let id = safe_id(&project_id)?; let vol = safe_id(&volume)?; let ch = safe_id(&chapter)?;
-    let path = data_root(&app)?.join(id).join("chapters").join(vol).join(format!("{ch}.md"));
-    if let Some(parent) = path.parent() { fs::create_dir_all(parent).map_err(|e| e.to_string())?; }
-    fs::write(path, content).map_err(|e| e.to_string())
+    atomic_write(&data_root(&app)?.join(id).join("chapters").join(vol).join(format!("{ch}.md")), content.as_bytes())
 }
+
 
 #[tauri::command]
 pub fn create_snapshot(app: AppHandle, project_id: String, volume: String, chapter: String, content: String, snapshot_id: String) -> Result<String, String> {
     let id = safe_id(&project_id)?; let vol = safe_id(&volume)?; let ch = safe_id(&chapter)?; let snap = safe_id(&snapshot_id)?;
     let path = data_root(&app)?.join(id).join("chapters").join(vol).join(format!("{ch}.snap")).join(format!("{snap}.md"));
-    if let Some(parent) = path.parent() { fs::create_dir_all(parent).map_err(|e| e.to_string())?; }
-    fs::write(&path, content).map_err(|e| e.to_string())?;
+    atomic_write(&path, content.as_bytes())?;
     Ok(path.to_string_lossy().to_string())
 }
 

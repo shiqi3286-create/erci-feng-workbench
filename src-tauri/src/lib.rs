@@ -15,6 +15,8 @@ pub fn run() {
             storage::delete_project,
             storage::load_chapter,
             storage::save_chapter,
+            storage::load_chapter_bundle,
+            storage::save_chapter_bundle,
             storage::create_snapshot,
             storage::restore_snapshot,
             storage::search_project,
