@@ -7,10 +7,13 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='7' fill='%23E89B54'/%3E%3Cpath d='M12 5v14M5 12h14' stroke='white' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Quicksand:wght@500;600;700&family=Noto+Sans+SC:wght@400;500;700;900&display=swap">
 <link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/theme-layout.css">
+<link rel="stylesheet" href="assets/css/theme-night.css">
 </head>
 <body data-page="workspace">
 
 <header class="app-topbar" id="app-topbar"></header>
+<div class="app-toolbar" id="app-toolbar"></div>
 
 <div class="workspace-shell">
 
@@ -45,6 +48,7 @@
         <button class="chip" data-action="对话">💬 生成对话</button>
         <button class="chip" data-action="人设检查">✓ 人设检查</button>
         <button class="chip" data-action="伏笔扫描">⚑ 伏笔扫描</button>
+        <button class="chip" data-action="插图">🖼 插图</button>
       </div>
       <div class="cmd-row">
         <textarea class="textarea" id="cmd-input" placeholder="告诉 AI 想写什么… 例如：继续写灯火熄灭后凛的反应，注意陆沉的口吻" rows="1"></textarea>
@@ -61,6 +65,8 @@
       <span>本章 <b class="mono" id="st-words">5,230</b> 字</span>
       <span>修改 <b class="mono" id="st-mod">3</b> 次</span>
       <span class="conflict" id="st-conflict">⚑ 待回收伏笔 <b class="mono">0</b></span>
+      <button class="chip" style="padding:3px 12px;font-size:11px" id="btn-scan-here" title="用本地规则扫描本章一致性（不消耗 AI 额度）">本地校验·本章</button>
+      <button class="chip" style="padding:3px 12px;font-size:11px" id="btn-scan-all" title="扫描全书人名/名词/伏笔一致性（不消耗 AI 额度）">校验·全书</button>
       <span class="spacer"></span>
       <button class="chip" style="padding:3px 12px;font-size:11px" id="btn-save" title="Ctrl+S">保存</button>
       <span>全屏专注 <button class="chip" style="padding:2px 10px;font-size:11px" id="btn-focus">开启</button></span>

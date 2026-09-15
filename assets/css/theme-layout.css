@@ -1,0 +1,138 @@
+/* ============================================================
+   晴笺 · 桌面应用式布局（双主题共用）
+   骨架：左侧固定图标导航栏（rail）+ 顶部细工具条 + 宽幅内容区
+   引入顺序：style.css → theme-layout.css → theme-night.css
+   ============================================================ */
+
+:root {
+  --rail-w: 64px;
+  --toolbar-h: 52px;
+}
+
+/* ---------- 全局：为左侧 rail 让位 ---------- */
+body {
+  padding-left: var(--rail-w);
+  padding-top: var(--toolbar-h);
+}
+
+/* ---------- 左侧图标导航栏（原 .app-topbar 改为 rail） ---------- */
+.app-topbar {
+  position: fixed;
+  left: 0; top: 0; bottom: 0;
+  width: var(--rail-w);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 14px 6px 12px;
+  background: var(--glass);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-right: 1px solid var(--line-soft);
+  border-bottom: none;
+  z-index: 60;
+}
+
+.app-topbar .brand {
+  flex-direction: column;
+  font-size: 0;              /* 隐藏品牌文字 */
+  gap: 0;
+}
+.app-topbar .brand .logo {
+  width: 36px; height: 36px;
+  border-radius: 12px;
+  margin-bottom: 8px;
+}
+.app-topbar .brand .logo svg { width: 19px; height: 19px; }
+
+.app-topbar .top-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 4px 0 0;
+  width: 100%;
+}
+.app-topbar .nav-item {
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 2px;
+  width: 100%;
+  font-size: 10.5px;
+  border-radius: 12px;
+}
+.app-topbar .nav-item svg { width: 19px; height: 19px; }
+
+/* rail 底部：主题切换 + 头像 */
+.app-topbar .topbar-right {
+  margin: auto 0 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: center;
+  width: 100%;
+  padding-top: 8px;
+  border-top: 1px solid var(--line-soft);
+}
+.app-topbar .topbar-right .icon-btn { width: 36px; height: 36px; }
+.app-topbar .avatar { width: 34px; height: 34px; }
+
+/* ---------- 顶部细工具条（每个页面第一个内容元素） ---------- */
+.app-toolbar {
+  position: fixed;
+  left: var(--rail-w); top: 0; right: 0;
+  height: var(--toolbar-h);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 18px;
+  background: var(--glass);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--line-soft);
+  z-index: 55;
+}
+.toolbar-crumb {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  min-width: 0;
+}
+.toolbar-crumb .sep { color: var(--muted); font-weight: 400; }
+.toolbar-crumb .sub { color: var(--muted); font-weight: 600; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.toolbar-right {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.toolbar-right .avatar { width: 30px; height: 30px; font-size: 11px; }
+
+/* ---------- 内容区适配 ---------- */
+.page-wrap {
+  max-width: 1400px;
+  padding: 20px 28px 60px;
+}
+
+/* 创作台：高度适配 toolbar（原 --topbar-h 已不适用） */
+.workspace-shell {
+  grid-template-rows: calc(100vh - var(--toolbar-h));
+}
+
+/* 专注模式：rail 也隐藏，正文居中 */
+body.focus-mode .app-topbar { display: none; }
+body.focus-mode {
+  padding-left: 0;
+  padding-top: 0;
+}
+body.focus-mode .app-toolbar { display: none; }
+body.focus-mode .workspace-shell { grid-template-rows: 100vh; }
+
+/* 响应式：窄屏隐藏 rail 文字，仅图标 */
+@media (max-width: 900px) {
+  body { padding-left: var(--rail-w); }
+}

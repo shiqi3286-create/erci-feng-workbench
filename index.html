@@ -7,20 +7,23 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='7' fill='%23E89B54'/%3E%3Cpath d='M12 5v14M5 12h14' stroke='white' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Quicksand:wght@500;600;700&family=Noto+Sans+SC:wght@400;500;700;900&display=swap">
 <link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/theme-layout.css">
+<link rel="stylesheet" href="assets/css/theme-night.css">
 </head>
 <body data-page="home">
 
 <header class="app-topbar" id="app-topbar"></header>
+<div class="app-toolbar" id="app-toolbar"></div>
 
 <main class="page-wrap">
 
-  <!-- 欢迎横幅 -->
-  <section class="card card-pad" style="display:flex;align-items:center;gap:22px;padding:26px 30px;margin-bottom:26px;background:
+  <!-- 欢迎横幅（问候语与头图按时段适配） -->
+  <section class="card card-pad hero-banner" id="hero-banner" style="display:flex;align-items:center;gap:22px;padding:26px 30px;margin-bottom:26px;background:
       radial-gradient(600px 200px at 90% 0%, rgba(246,217,180,.55), transparent 60%),
       var(--paper);">
     <div style="flex:1">
-      <p class="eyebrow" style="margin-bottom:6px">SUNNY WRITING STUDIO</p>
-      <h1 style="font-size:24px;margin-bottom:6px">下午好，阿晴 <span style="color:var(--sun)">☀</span></h1>
+      <p class="eyebrow" id="hero-slogan" style="margin-bottom:6px">SUNNY WRITING STUDIO</p>
+      <h1 id="hero-greet" style="font-size:24px;margin-bottom:6px">你好 <span style="color:var(--sun)">☀</span></h1>
       <p class="muted small" id="hero-line">正在读取作品库…</p>
       <div class="flex gap-6" style="margin-top:14px">
         <a class="btn btn-primary" href="workspace.html">继续写作</a>
@@ -28,37 +31,52 @@
       </div>
     </div>
     <div class="hero-art" style="width:210px;border-radius:18px;overflow:hidden;box-shadow:var(--shadow-card);flex-shrink:0">
-      <img src="assets/img/cover-window.jpg" alt="写作插画" style="width:100%;aspect-ratio:16/10;object-fit:cover">
+      <img id="hero-img" src="assets/img/cover-window.jpg" alt="写作插画" style="width:100%;aspect-ratio:16/10;object-fit:cover">
     </div>
   </section>
 
-  <!-- 项目统计条 -->
-  <section class="grid grid-4" style="margin-bottom:26px">
+  <!-- 项目统计条（动态：连续写作/本周趋势） -->
+  <section class="grid grid-4" style="margin-bottom:16px">
     <div class="card card-pad" style="display:flex;align-items:center;gap:12px">
       <div style="width:40px;height:40px;border-radius:13px;background:var(--sun-soft);color:var(--sun);display:grid;place-items:center">${''}</div>
-      <div><div class="eyebrow">作品</div><div class="display-num" style="font-size:20px" id="stat-books">3</div></div>
+      <div><div class="eyebrow">作品</div><div class="display-num" style="font-size:20px" id="stat-books">0</div></div>
     </div>
     <div class="card card-pad" style="display:flex;align-items:center;gap:12px">
-      <div style="width:40px;height:40px;border-radius:13px;background:var(--peach-soft);color:#C46A50;display:grid;place-items:center"></div>
-      <div><div class="eyebrow">总字数</div><div class="display-num" style="font-size:20px" id="stat-words">61.5万</div></div>
+      <div style="width:40px;height:40px;border-radius:13px;background:var(--peach-soft);color:var(--tag-peach);display:grid;place-items:center"></div>
+      <div><div class="eyebrow">总字数</div><div class="display-num" style="font-size:20px" id="stat-words">0</div></div>
     </div>
     <div class="card card-pad" style="display:flex;align-items:center;gap:12px">
-      <div style="width:40px;height:40px;border-radius:13px;background:var(--sky-soft);color:#4A7EA6;display:grid;place-items:center"></div>
-      <div><div class="eyebrow">章节</div><div class="display-num" style="font-size:20px" id="stat-chapters">120</div></div>
+      <div style="width:40px;height:40px;border-radius:13px;background:var(--sky-soft);color:var(--tag-sky);display:grid;place-items:center"></div>
+      <div><div class="eyebrow">连续写作</div><div class="display-num" style="font-size:20px" id="stat-streak">0 <span style="font-size:12px;font-weight:400">天</span></div></div>
     </div>
     <div class="card card-pad" style="display:flex;align-items:center;gap:12px">
-      <div style="width:40px;height:40px;border-radius:13px;background:var(--lilac-soft);color:#7A63B3;display:grid;place-items:center"></div>
-      <div><div class="eyebrow">累计 AI 生成</div><div class="display-num" style="font-size:20px" id="stat-ai">26.3万</div></div>
+      <div style="width:40px;height:40px;border-radius:13px;background:var(--lilac-soft);color:var(--tag-lilac);display:grid;place-items:center"></div>
+      <div><div class="eyebrow">本周写作</div><div class="display-num" style="font-size:20px" id="stat-week">0 <span style="font-size:12px;font-weight:400">字</span></div></div>
     </div>
   </section>
+  <!-- 本周写作趋势 -->
+  <section class="card card-pad" style="margin-bottom:26px">
+    <div class="flex-between" style="margin-bottom:8px">
+      <div class="eyebrow">本周写作趋势</div>
+      <div class="small muted" id="week-summary"></div>
+    </div>
+    <div class="bar-chart" id="week-chart" style="height:64px"></div>
+  </section>
 
-  <!-- 作品网格 -->
-  <div class="flex-between mb-14">
-    <h2 class="section-title"><span class="dot"></span>我的作品</h2>
-    <div class="flex gap-6">
-      <button class="btn btn-ghost btn-sm" id="btn-backup">备份</button>
-      <button class="btn btn-ghost btn-sm" id="btn-restore">恢复</button>
-      <input type="file" id="restore-file" accept="application/json,.json" style="display:none">
+  <!-- 作品工具行：搜索 + 筛选 + 排序 -->
+  <div class="flex-between mb-14" style="flex-wrap:wrap;gap:10px">
+    <h2 class="section-title" style="margin:0"><span class="dot"></span>我的作品 <span class="tag tag-mint" style="margin-left:6px" id="lib-count">0</span></h2>
+    <div class="flex gap-6" style="flex-wrap:wrap">
+      <input class="input" id="lib-search" placeholder="搜索标题 / 题材 / 简介…" style="width:200px">
+      <select class="select" id="lib-filter-status" style="width:auto">
+        <option value="">全部状态</option>
+        <option>连载中</option>
+        <option>草稿</option>
+        <option>完结</option>
+      </select>
+      <select class="select" id="lib-filter-genre" style="width:auto">
+        <option value="">全部题材</option>
+      </select>
       <button class="btn btn-soft btn-sm" id="btn-sort-lib">最近更新 ↓</button>
     </div>
   </div>

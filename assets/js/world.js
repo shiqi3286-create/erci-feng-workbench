@@ -259,7 +259,7 @@
 
   /* ---------- 编辑弹窗 ---------- */
   function editChar(c) {
-    APP.modal({
+    const m = APP.modal({
       title: '编辑人物 · ' + c.name,
       submitText: '保存',
       bodyHtml: `
@@ -267,7 +267,16 @@
         <div class="field"><label>定位</label><input class="input" name="role" value="${APP.esc(c.role)}"></div>
         <div class="field"><label>简介</label><textarea class="textarea" name="brief" rows="3">${APP.esc(c.brief)}</textarea></div>
         <div class="field"><label>习惯台词</label><input class="input" name="speech" value="${APP.esc(c.speech)}"></div>
-        <div class="field"><label>人物关系</label><input class="input" name="relation" value="${APP.esc(c.relation)}"></div>`,
+        <div class="field"><label>人物关系</label><input class="input" name="relation" value="${APP.esc(c.relation)}"></div>
+        <div class="field">
+          <label>头像（§12-5：AI 生成或上传）</label>
+          <div class="flex gap-6">
+            <button type="button" class="btn btn-soft btn-sm" id="btn-av-gen">✨ AI 生成头像</button>
+            <button type="button" class="btn btn-soft btn-sm" id="btn-av-up">上传图片</button>
+            <input type="file" id="av-file" accept="image/*" hidden>
+          </div>
+          <div class="small muted" id="av-hint" style="margin-top:6px">${c.avatar ? '已设置头像（生成后将自动替换）' : '暂无头像'}</div>
+        </div>`,
       onSubmit: (root) => {
         const f = APP.formData(root);
         if (!f.name.trim()) { APP.toast('姓名不能为空', 'warn'); return false; }
@@ -277,6 +286,47 @@
         APP.toast('人物已保存', 'success');
         return true;
       }
+    });
+
+    /* 头像：AI 生成（画图渠道/演示占位） */
+    const genBtn = m.root.querySelector('#btn-av-gen');
+    if (genBtn) genBtn.addEventListener('click', async () => {
+      genBtn.disabled = true; genBtn.textContent = '生成中…';
+      try {
+        const r = await APP.ai.generateImage({
+          prompt: '人物立绘头像插画：' + c.name + '，' + (c.role || '角色') + '。' + (c.brief || '').slice(0, 140) + '。暖色调治愈系、柔和光影、半身肖像、细腻笔触。'
+        });
+        APP.store.updateChar(c.id, { avatar: r.dataUrl });
+        c.avatar = r.dataUrl;
+        const hint = m.root.querySelector('#av-hint');
+        if (hint) hint.textContent = r.demo ? '已生成演示头像（配置画图渠道后生成真实头像）' : '头像已更新';
+        renderGrid(); renderDetail();
+      } catch (e) { APP.toast('头像生成失败：' + e.message, 'warn'); }
+      genBtn.disabled = false; genBtn.textContent = '✨ AI 生成头像';
+    });
+    /* 头像：本地上传并压缩到 256px */
+    const upBtn = m.root.querySelector('#btn-av-up');
+    const fileInput = m.root.querySelector('#av-file');
+    if (upBtn) upBtn.addEventListener('click', () => fileInput.click());
+    if (fileInput) fileInput.addEventListener('change', () => {
+      const f = fileInput.files[0]; if (!f) return;
+      const rd = new FileReader();
+      rd.onload = () => {
+        const img = new Image();
+        img.onload = () => {
+          const cv = document.createElement('canvas');
+          const s = 256;
+          cv.width = s; cv.height = Math.max(1, Math.round(img.height / img.width * s));
+          cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+          APP.store.updateChar(c.id, { avatar: cv.toDataURL('image/jpeg', 0.85) });
+          c.avatar = cv.toDataURL('image/jpeg', 0.85);
+          const hint = m.root.querySelector('#av-hint');
+          if (hint) hint.textContent = '头像已更新';
+          renderGrid(); renderDetail();
+        };
+        img.src = rd.result;
+      };
+      rd.readAsDataURL(f);
     });
   }
   function delChar(c) {

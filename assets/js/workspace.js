@@ -165,6 +165,9 @@
     const vol = D.volumes.find(v => v.id === volId);
     const beat = vol && vol.beats.find(b => b.id === beatId);
     if (!beat) return;
+    /* 懒加载（§12-1）：旧章节正文已 flush 到 bundle，从内存卸载，只留当前章 */
+    const prevBeat = currentBeat();
+    const prevId = prevBeat && prevBeat.id;
     D.current = {
       projectId: D.current.projectId,
       volumeId: volId,
@@ -175,6 +178,7 @@
       modifiedCount: beat.modifiedCount || 0
     };
     APP.store.save();
+    if (prevBeat && prevId !== beatId) prevBeat.paras = [];
     selectedPara = null;
     dirty = false;
     renderSide(activeTab, $('#side-search-input').value);
@@ -243,14 +247,18 @@
         <span class="tag ${st === 'done' ? 'tag-mint' : st === 'writing' ? 'tag-sun' : 'tag-mute'}">${st === 'done' ? '已完结' : st === 'writing' ? '写作中' : '待写'}</span>
         <span class="spacer"></span>
         <button class="chip" id="btn-export-ch" title="导出本章 TXT">导出本章</button>
-        <button class="chip" id="btn-export-book" title="导出全书 Markdown">导出全书 MD</button>
+        <button class="chip" id="btn-export-book" title="导出全书 Markdown">全书 MD</button>
+        <button class="chip" id="btn-export-platform" title="按平台偏好排版导出">平台排版</button>
       </div>
       <div class="doc-content" id="doc-content">${paras.length ? paras.map((p, i) =>
-        `<p class="${p.cls || ''}" data-p="${i}" contenteditable="true" spellcheck="false">${APP.esc(p.text)}</p>`).join('') : ''}
+        p.cls === 'img' && p.src
+          ? `<figure class="img-para" data-p="${i}"><img src="${p.src}" alt="插图" loading="lazy"><figcaption><button class="chip chip-mini" data-img-dl>下载</button><button class="chip chip-mini" data-img-del>删除</button></figcaption></figure>`
+          : `<p class="${p.cls || ''}" data-p="${i}" contenteditable="true" spellcheck="false">${APP.esc(p.text)}</p>`).join('') : ''}
       </div>`;
 
     $('#btn-export-ch').addEventListener('click', exportChapter);
     $('#btn-export-book').addEventListener('click', exportBook);
+    $('#btn-export-platform').addEventListener('click', exportBookPlatformed);
 
     if (!paras.length) {
       const empty = APP.el(`
@@ -287,13 +295,36 @@
         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); p.blur(); }
       });
     });
+    /* 插图段：下载 / 删除 */
+    $('#doc-content').querySelectorAll('figure.img-para').forEach(fig => {
+      const idx = +fig.dataset.p;
+      fig.addEventListener('click', e => {
+        const dl = e.target.closest('[data-img-dl]');
+        const del = e.target.closest('[data-img-del]');
+        const beat = currentBeat();
+        const para = beat && beat.paras[idx];
+        if (dl && para) {
+          const a = document.createElement('a');
+          a.href = para.src; a.download = '插图_' + (idx + 1) + '.png';
+          document.body.appendChild(a); a.click(); a.remove();
+          APP.toast('已下载插图', 'success');
+        } else if (del && beat) {
+          beat.paras.splice(idx, 1);
+          APP.store.setChapterParas(D.current.volumeId, D.current.chapterId, beat.paras);
+          renderDoc(); setSaveState(false);
+          APP.toast('已删除插图', '');
+        }
+      });
+    });
   }
 
+  let lastSelectedIdx = -1;
   function selectPara(p) {
     document.querySelectorAll('#doc-content p').forEach(x => { x.classList.remove('sel'); x.classList.remove('editing'); });
     const already = p.classList.contains('sel');
     p.classList.add('sel');
     const idx = +p.dataset.p;
+    lastSelectedIdx = idx;
     const beat = currentBeat();
     const isAI = p.classList.contains('ai-mark');
     const hint = $('#cmd-hint');
@@ -350,6 +381,9 @@
     cur.modifiedCount = beat.modifiedCount;
     $('#st-mod').textContent = beat.modifiedCount;
     APP.store.touchChapter(cur.volumeId, cur.chapterId, { modified: 0 });
+    /* 记录上次写到位置（作品卡片展示） */
+    const proj = APP.store.currentProject();
+    if (proj && cur.chapterTitle) proj.lastChapter = cur.chapterTitle;
     const ok = await flushChapter();
     if (ok) {
       setSaveState(true);
@@ -370,6 +404,28 @@
   /* ================= 导出 ================= */
   function safeName(s) { return String(s || '未命名').replace(/[\\/:*?"<>|]/g, '_'); }
 
+  /* 懒加载导出辅助：逐章从 bundle 拉正文，用后释放（当前章除外） */
+  async function loadParasForExport() {
+    const p = APP.store.currentProject();
+    if (!p) return null;
+    const cur = D.current;
+    for (const v of D.volumes) {
+      for (const b of v.beats || []) {
+        if (!Array.isArray(b.paras) || !b.paras.length) {
+          await APP.store.loadChapterBundle(p.id, v.id, b.id);
+        }
+      }
+    }
+    return () => {
+      for (const v of D.volumes) {
+        for (const b of v.beats || []) {
+          if (cur && cur.projectId === p.id && cur.chapterId === b.id) continue;
+          b.paras = [];
+        }
+      }
+    };
+  }
+
   function exportChapter() {
     const beat = currentBeat();
     const p = APP.store.currentProject();
@@ -379,10 +435,11 @@
     APP.toast('本章已导出为 TXT', 'success');
   }
 
-  function exportBook() {
+  async function exportBook() {
     const p = APP.store.currentProject();
     if (!p) return;
     let total = 0;
+    const release = await loadParasForExport();
     let md = '# ' + p.title + '\n\n> 题材：' + (p.genre || '未分类') + ' · 由 晴笺 · AI 小说创作台 导出\n';
     D.volumes.forEach(v => {
       md += '\n## ' + v.title + '\n';
@@ -392,9 +449,38 @@
         if (!b.paras || !b.paras.length) md += '\n（本章暂无正文）';
       });
     });
+    release && release();
     if (!total) { APP.toast('全书还没有正文可导出', 'warn'); return; }
     APP.downloadText(safeName(p.title) + '_全书.md', md, 'text/markdown');
     APP.toast('全书已导出为 Markdown（' + APP.fmt(total) + ' 字）', 'success');
+  }
+
+  /* 平台排版导出（§12-8）：按个人信息页「平台发布偏好」生成 TXT */
+  async function exportBookPlatformed() {
+    const p = APP.store.currentProject();
+    if (!p) return;
+    const pf = (D.user && D.user.publish) || {};
+    const fmt = pf.chapterTitleFmt || '第{no}章 {title}';
+    const indent = pf.paragraphIndent !== false;
+    const platform = pf.platform || '平台';
+    let total = 0;
+    const release = await loadParasForExport();
+    let out = p.title + '\n\n';
+    D.volumes.forEach(v => {
+      (v.beats || []).forEach(b => {
+        const title = fmt.replace('{no}', b.no).replace('{title}', b.title);
+        out += '\n' + title + '\n\n';
+        (b.paras || []).forEach(x => {
+          out += (indent ? '　　' : '') + x.text + '\n\n';
+          total += (x.text || '').length;
+        });
+        if (!b.paras || !b.paras.length) out += '（本章暂无正文）\n\n';
+      });
+    });
+    release && release();
+    if (!total) { APP.toast('全书还没有正文可导出', 'warn'); return; }
+    APP.downloadText(safeName(p.title) + '_' + safeName(platform) + '排版.txt', out);
+    APP.toast('已按「' + platform + '」排版导出（' + APP.fmt(total) + ' 字）', 'success');
   }
 
   /* ================= 中栏：指令区 ================= */
@@ -403,9 +489,38 @@
 
   $('#cmd-quick').addEventListener('click', e => {
     const chip = e.target.closest('.chip'); if (!chip) return;
+    if (chip.dataset.action === '插图') { runImage(); return; }
     input.value = '[' + chip.dataset.action + '] ' + (quickActions[chip.dataset.action] || '');
     input.focus();
   });
+
+  /* ---------- 插图生成（§12-5：画图渠道 → 图片段落） ---------- */
+  let imgRunning = false;
+  async function runImage() {
+    if (imgRunning) { APP.toast('正在生成插图，请稍候', 'warn'); return; }
+    const beat = currentBeat();
+    if (!beat) return;
+    const sel = selectedText();
+    const lastText = beat.paras.filter(x => x.cls !== 'img').slice(-1)[0];
+    const src = sel || (lastText && lastText.text) || '';
+    if (!src.trim()) { APP.toast('请先选中一段文字，或让 AI 生成正文后再插图', 'warn'); return; }
+    imgRunning = true;
+    APP.toast('正在生成插图…（' + (APP.ai.imageChannels().length ? '画图渠道' : '演示占位') + '）', '');
+    try {
+      const r = await APP.ai.generateImage({
+        prompt: '为以下小说场景绘制一幅文学插画，治愈系暖色调、柔和光影、细腻笔触，画面有叙事感：\n' + src.trim().slice(0, 400)
+      });
+      const cur = D.current;
+      const idx = lastSelectedIdx >= 0 ? lastSelectedIdx : beat.paras.length - 1;
+      beat.paras.splice(idx + 1, 0, { cls: 'img', src: r.dataUrl, text: '' });
+      APP.store.setChapterParas(cur.volumeId, cur.chapterId, beat.paras);
+      renderDoc(); setSaveState(false);
+      APP.toast('插图已插入段落下方' + (r.demo ? '（演示占位图，配置画图渠道后生成真实插图）' : ''), 'success');
+    } catch (e) {
+      APP.toast('插图生成失败：' + e.message, 'warn');
+    }
+    imgRunning = false;
+  }
 
   function selectedText() {
     const p = document.querySelector('#doc-content p.sel');
@@ -419,6 +534,9 @@
     aiRunning = true;
     const sendBtn = $('#cmd-send');
     sendBtn.classList.add('loading');
+    sendBtn.title = '停止生成';
+    const abortCtrl = new AbortController();
+    window.__abortAI = () => abortCtrl.abort();
 
     const selected = selectedText();
     // 轨迹：读取设定 → 检索伏笔 → 组装上下文 → 生成 → 校验
@@ -448,16 +566,33 @@
         user: userText,
         params: {},
         forceDemo: false,
+        signal: abortCtrl.signal,
         onDelta: (delta, full) => {
           if (lastP) { lastP.textContent = full; lastP.classList.remove('pending'); }
         }
       });
       setTrace(3, 'done', APP.ai.estTokens(text).toLocaleString() + ' 字');
     } catch (e) {
-      setTrace(3, 'done', '生成失败');
-      APP.toast('生成失败：' + e.message, 'warn');
-      if (lastP) lastP.remove();
-      aiRunning = false; sendBtn.classList.remove('loading');
+      const cancelled = e && e.name === 'AbortError';
+      setTrace(3, 'done', cancelled ? '已停止' : '生成失败');
+      if (cancelled) {
+        /* 保留已生成部分为未确认 AI 段 */
+        if (lastP && lastP.textContent && lastP.textContent !== '…') {
+          const text = lastP.textContent;
+          const paras = text.trim().split(/\n+/).map(x => ({ cls: 'ai-mark', text: x.trim() })).filter(x => x.text);
+          const beatRef = currentBeat();
+          if (beatRef) {
+            beatRef.paras = beatRef.paras.concat(paras);
+            APP.store.setChapterParas(D.current.volumeId, D.current.chapterId, beatRef.paras);
+            renderDoc();
+          }
+          APP.toast('已停止生成，已生成的部分保留为待确认段落', 'warn');
+        } else if (lastP) lastP.remove();
+      } else {
+        APP.toast('生成失败：' + e.message, 'warn');
+        if (lastP) lastP.remove();
+      }
+      aiRunning = false; sendBtn.classList.remove('loading'); sendBtn.title = '发送'; window.__abortAI = null;
       return;
     }
 
@@ -480,6 +615,8 @@
     renderCtx('ctx');
     aiRunning = false;
     sendBtn.classList.remove('loading');
+    sendBtn.title = '发送';
+    window.__abortAI = null;
   }
 
   function updateBudget() {
@@ -492,7 +629,12 @@
     $('#tk-fill').style.width = D.contextBudget.percent + '%';
   }
 
+  /* 生成中点击发送按钮 = 停止（§12-4 取消链路） */
   $('#cmd-send').addEventListener('click', () => {
+    if (aiRunning) {
+      if (window.__abortAI) window.__abortAI();
+      return;
+    }
     const t = input.value.trim();
     if (!t) { APP.toast('先输入一句指令吧', 'warn'); return; }
     runAI('指令', t); input.value = '';
@@ -671,12 +813,31 @@
     });
   }
 
+  /* ---------- 本地规则校验（§12-3） ---------- */
+  async function runScan(scope) {
+    const label = scope === 'all' ? '全书' : '本章';
+    const res = await APP.store.scanLocal(scope === 'all' ? 'all' : 'here');
+    if (!res.length) { APP.toast('✓ ' + label + '一致性检查通过：未发现明显问题', 'success'); return; }
+    res.forEach(r => D.suggestions.unshift({ type: r.type, text: r.text + '（' + label + '本地校验）', from: 'local' }));
+    APP.store.save();
+    document.querySelectorAll('.ctx-tab').forEach(b => b.classList.remove('active'));
+    const btn = document.querySelector('.ctx-tab[data-tab="sug"]');
+    if (btn) btn.classList.add('active');
+    renderCtx('sug');
+    APP.toast('本地校验发现 ' + res.length + ' 条可核对项，已加入建议面板', 'warn');
+  }
+
   $('#ctx-tabs').addEventListener('click', e => {
     const btn = e.target.closest('.ctx-tab'); if (!btn) return;
     document.querySelectorAll('.ctx-tab').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     renderCtx(btn.dataset.tab);
   });
+
+  const scanHere = document.getElementById('btn-scan-here');
+  if (scanHere) scanHere.addEventListener('click', () => runScan('here'));
+  const scanAll = document.getElementById('btn-scan-all');
+  if (scanAll) scanAll.addEventListener('click', () => runScan('all'));
 
   /* ================= 状态栏：待回收伏笔数 ================= */
   function renderConflict() {

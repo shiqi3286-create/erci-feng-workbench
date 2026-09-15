@@ -8,13 +8,35 @@
 
 window.DATA = {
 
-  /* ---------- 用户与偏好 ---------- */
+  /* ---------- 用户与偏好（profile.html 编辑） ---------- */
   user: {
-    name: "阿晴",
+    name: "阿晴",              // 问候语使用；为空时回退「作者」
+    avatar: "",                // 头像 dataURL（本地存储）
+    signature: "慢慢写，总会写完的。",
     theme: "sunny",            // sunny 奶油浅色 / night 暗色（预留）
     defaultModel: "deepseek-v3",
-    autoSave: 60,              // 秒
-    novelStyle: "细腻治愈 · 慢热叙事"
+    novelStyle: "细腻治愈 · 慢热叙事",
+    goals: {                   // 创作目标
+      dailyWords: 2000,        // 日更字数目标
+      finishTarget: ""         // 完结目标（作品名）
+    },
+    prefs: {                   // 偏好设置（自模板页迁入 AI 开关）
+      editorFontSize: 15.5,
+      lineHeight: 2.1,
+      autoSaveSec: 60,
+      aiAutoSend: false
+    },
+    publish: {                 // 平台发布偏好
+      platform: "番茄小说",
+      paragraphIndent: true,   // 段落缩进
+      chapterTitleFmt: "第{no}章 {title}"
+    },
+    stats: {                   // 写作统计（每日净增字数，save 时自动记录）
+      daily: {
+        "2026-09-07": 1560, "2026-09-08": 0, "2026-09-09": 2320,
+        "2026-09-10": 1880, "2026-09-11": 0, "2026-09-12": 2140, "2026-09-13": 1750
+      }
+    }
   },
 
   /* ---------- 项目列表 ---------- */
@@ -79,8 +101,9 @@ window.DATA = {
   /* ---------- AI 调用记录（追加式日志） ---------- */
   aiCalls: [],
 
-  /* ---------- 默认 API 渠道 id ---------- */
+  /* ---------- 默认 API 渠道 id（写作 / 画图 分离） ---------- */
   defaultApi: "a1",
+  defaultImageApi: "",
 
   /* ---------- 项目级数据 ----------
    * 每个项目独立持有：分卷大纲 / 人物 / 地点 / 物品 / 伏笔 / 时间线
@@ -284,13 +307,22 @@ window.DATA = {
         { id: "tp8", name: "伏笔扫描", desc: "提取本章新伏笔并对比伏笔库。", icon: "flag", vars: ["{{伏笔库}}", "{{本章正文}}"], params: { temp: 0.3, max: 2000 } },
         { id: "tp9", name: "名词统一", desc: "找出前后不一致的人名、地名、叫法。", icon: "search", vars: ["{{全文索引}}"], params: { temp: 0.2, max: 1500 } }
       ]
+    },
+    {
+      group: "视觉生成",
+      items: [
+        { id: "tp10", name: "场景插图", desc: "把选中文字转成带氛围与镜头的视觉提示词，供画图渠道生成插图。", icon: "image", vars: ["{{选中文本}}", "{{画风}}"], params: { temp: 0.9, max: 600 } },
+        { id: "tp11", name: "人物立绘/头像", desc: "根据人物设定生成形象提示词（服装、气质、参考画风）。", icon: "user", vars: ["{{人物设定}}", "{{画风}}"], params: { temp: 0.9, max: 500 } },
+        { id: "tp12", name: "作品封面", desc: "生成封面提示词：主视觉、构图、色调、留字建议。", icon: "book", vars: ["{{作品简介}}", "{{风格}}"], params: { temp: 0.9, max: 500 } }
+      ]
     }
   ],
 
-  /* ---------- API 渠道 ---------- */
+  /* ---------- API 渠道（type: text 写作 / image 画图） ---------- */
   apis: [
-    { id: "a1", name: "主力中转", base: "https://api.example.com/v1", model: "deepseek-v3", key: "sk-••••••••4f2a", status: "on", enabled: false, temp: 0.8, used: 1284000, quota: "¥38.60" },
-    { id: "a2", name: "备用渠道", base: "https://relay.example.org/v1", model: "glm-4-flash", key: "sk-••••••••9c11", status: "on", enabled: false, temp: 0.8, used: 402000, quota: "¥12.10" },
-    { id: "a3", name: "未配置", base: "", model: "—", key: "", status: "off", enabled: false, temp: 0.7, used: 0, quota: "—" }
+    { id: "a1", type: "text", name: "主力中转", base: "https://api.example.com/v1", model: "deepseek-v3", key: "sk-••••••••4f2a", status: "on", enabled: false, temp: 0.8, used: 1284000, quota: "¥38.60" },
+    { id: "a2", type: "text", name: "备用渠道", base: "https://relay.example.org/v1", model: "glm-4-flash", key: "sk-••••••••9c11", status: "on", enabled: false, temp: 0.8, used: 402000, quota: "¥12.10" },
+    { id: "a3", type: "text", name: "未配置", base: "", model: "—", key: "", status: "off", enabled: false, temp: 0.7, used: 0, quota: "—" },
+    { id: "a4", type: "image", name: "画图中转", base: "", model: "—", key: "", status: "off", enabled: false, temp: 0.8, used: 0, quota: "—" }
   ]
 };

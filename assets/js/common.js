@@ -37,7 +37,11 @@ window.APP = (function (_prev) {
     camera: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.4"/></svg>',
     edit: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>',
     trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>',
-    back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>'
+    back: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5M12 19l-7-7 7-7"/></svg>',
+    calendar: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>',
+    chart: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M7 17V9M12 17V5M17 17v-6"/></svg>',
+    image: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-4.3-4.3a1 1 0 0 0-1.4 0L7 19"/></svg>',
+    moon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>'
   };
 
   function icon(name, cls) {
@@ -64,7 +68,7 @@ window.APP = (function (_prev) {
     }, 2200);
   }
 
-  /* ---------- 顶栏渲染 ---------- */
+  /* ---------- 顶栏渲染（桌面布局：左侧 rail + 顶部工具条） ---------- */
   const NAV = [
     { href: 'index.html', key: 'home', label: '作品库', icon: 'home' },
     { href: 'workspace.html', key: 'workspace', label: '创作台', icon: 'pen' },
@@ -73,24 +77,123 @@ window.APP = (function (_prev) {
     { href: 'template.html', key: 'template', label: '模板·API', icon: 'sliders' }
   ];
 
+  function avatarHtml() {
+    const user = window.DATA ? window.DATA.user : { name: '写手' };
+    const name = (user.name && user.name.trim()) || '作者';
+    return user.avatar
+      ? `<img src="${user.avatar}" alt="头像" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
+      : name.slice(0, 1);
+  }
+
+  /* 左侧固定图标导航栏（rail） */
   function renderTopbar(activeKey) {
     const bar = document.getElementById('app-topbar');
     if (!bar) return;
     const nav = NAV.map(n =>
-      `<a class="nav-item ${n.key === activeKey ? 'active' : ''}" href="${n.href}">${icon(n.icon)}<span>${n.label}</span></a>`
+      `<a class="nav-item ${n.key === activeKey ? 'active' : ''}" href="${n.href}" title="${n.label}">${icon(n.icon)}<span>${n.label}</span></a>`
     ).join('');
-    const user = window.DATA ? window.DATA.user : { name: '写手' };
+    const night = document.body.classList.contains('theme-night');
     bar.innerHTML = `
-      <a class="brand" href="index.html">
-        <span class="logo">${icon('sun')}</span>
-        <span>晴笺 · 创作台</span>
+      <a class="brand" href="index.html" title="晴笺">
+        <span class="logo">${icon('moon')}</span>
+        <span>晴笺</span>
       </a>
       <nav class="top-nav">${nav}</nav>
       <div class="topbar-right">
-        <button class="icon-btn" title="搜索" onclick="APP.openSearch()">${icon('search')}</button>
-        <button class="icon-btn" title="设置" onclick="location.href='template.html'">${icon('settings')}</button>
-        <span class="avatar">${user.name.slice(0, 1)}</span>
+        <button class="icon-btn" id="btn-theme" title="${night ? '切换到白天' : '切换到夜晚'}">${icon(night ? 'sun' : 'moon')}</button>
+        <a class="avatar" href="profile.html" title="个人信息">${avatarHtml()}</a>
       </div>`;
+    const tb = document.getElementById('btn-theme');
+    if (tb) tb.addEventListener('click', () => toggleTheme());
+  }
+
+  /* 顶部细工具条（页面标题 + 搜索 / 设置 / 头像） */
+  const TOOLBAR_TITLES = {
+    home: '作品库', workspace: '创作台', outline: '大纲',
+    world: '设定库', template: '模板 · API', profile: '个人信息'
+  };
+  function renderToolbar() {
+    const bar = document.getElementById('app-toolbar');
+    if (!bar) return;
+    const page = document.body.dataset.page || '';
+    const title = TOOLBAR_TITLES[page] || '晴笺';
+    let sub = '';
+    const cur = (window.APP.store && APP.store.currentProject && APP.store.currentProject()) || null;
+    if (cur && (page === 'workspace' || page === 'outline' || page === 'world')) sub = cur.title;
+    bar.innerHTML = `
+      <div class="toolbar-crumb">
+        <span>${esc(title)}</span>
+        ${sub ? `<span class="sep">·</span><span class="sub">${esc(sub)}</span>` : ''}
+      </div>
+      <div class="toolbar-right">
+        <button class="icon-btn" title="全局搜索" onclick="APP.openSearch()">${icon('search')}</button>
+        <div class="topbar-menu" id="toolbar-settings">
+          <button class="icon-btn" id="btn-settings-gear" title="设置">${icon('settings')}</button>
+          <div class="menu-panel" id="settings-menu" style="display:none">
+            <button class="menu-item" data-go="profile.html">${icon('user')} 个人信息</button>
+            <button class="menu-item" data-go="template.html">${icon('sliders')} 模板 · API</button>
+            <div class="menu-sep"></div>
+            <button class="menu-item" id="menu-check-update">${icon('refresh')} 检查更新</button>
+          </div>
+        </div>
+        <a class="avatar" href="profile.html" title="个人信息">${avatarHtml()}</a>
+      </div>`;
+    /* 齿轮下拉菜单 */
+    const gear = document.getElementById('btn-settings-gear');
+    const menu = document.getElementById('settings-menu');
+    if (gear && menu) {
+      gear.addEventListener('click', e => {
+        e.stopPropagation();
+        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+      });
+      document.addEventListener('click', () => { if (menu) menu.style.display = 'none'; });
+      menu.querySelectorAll('.menu-item[data-go]').forEach(it => {
+        it.addEventListener('click', () => { location.href = it.dataset.go; });
+      });
+      const cu = document.getElementById('menu-check-update');
+      if (cu) {
+        cu.addEventListener('click', () => {
+          if (window.APP.updater) window.APP.updater.check(true);
+          else APP.toast('检查更新需在模板·API 页使用', 'warn');
+        });
+      }
+    }
+  }
+
+  /* ---------- 双主题切换（白天暖阳 / 夜晚星辉） ---------- */
+  const THEME_KEY = 'qj-theme';
+  function applyTheme(night) {
+    document.body.classList.toggle('theme-night', !!night);
+    const btn = document.getElementById('btn-theme');
+    if (btn) {
+      btn.innerHTML = icon(night ? 'sun' : 'moon');
+      btn.title = night ? '切换到白天' : '切换到夜晚';
+    }
+    if (window.DATA) {
+      window.DATA.user = window.DATA.user || {};
+      window.DATA.user.prefs = window.DATA.user.prefs || {};
+      window.DATA.user.prefs.theme = night ? 'night' : 'day';
+      if (window.APP.store && window.APP.store.save) { try { window.APP.store.save(); } catch (e) {} }
+    }
+    try { localStorage.setItem(THEME_KEY, night ? 'night' : 'day'); } catch (e) {}
+  }
+  function toggleTheme() {
+    applyTheme(!document.body.classList.contains('theme-night'));
+  }
+  function initTheme() {
+    let night = null;
+    try {
+      const s = localStorage.getItem(THEME_KEY);
+      if (s) night = (s === 'night');
+    } catch (e) {}
+    if (night === null && window.DATA && window.DATA.user && window.DATA.user.prefs && window.DATA.user.prefs.theme) {
+      night = (window.DATA.user.prefs.theme === 'night');
+    }
+    if (night === null) {  /* 无记录：跟随时间段（22:00–05:00 自动夜间） */
+      const h = new Date().getHours();
+      night = (h >= 22 || h < 5);
+    }
+    applyTheme(night);
   }
 
   /* ---------- 全局搜索（跨项目：章节 / 人物 / 伏笔 / 地点 / 物品） ---------- */
@@ -254,9 +357,13 @@ window.APP = (function (_prev) {
     return out;
   }
 
-  return { icon, toast, renderTopbar, fmt, esc, debounce, el, modal, formData, openSearch, searchAll, downloadText };
+  return { icon, toast, renderTopbar, renderToolbar, initTheme, toggleTheme, applyTheme, fmt, esc, debounce, el, modal, formData, openSearch, searchAll, downloadText };
   })();
   return Object.assign({}, _prev || {}, api);
 })(window.APP);
 
-document.addEventListener('DOMContentLoaded', () => { APP.renderTopbar(document.body.dataset.page || ''); });
+document.addEventListener('DOMContentLoaded', () => {
+  APP.renderTopbar(document.body.dataset.page || '');
+  APP.renderToolbar();
+  APP.initTheme();
+});

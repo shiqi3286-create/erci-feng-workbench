@@ -135,16 +135,19 @@
     });
   });
 
-  /* ---------- API 渠道 ---------- */
+  /* ---------- API 渠道：左列表（写作/画图分组） + 右内联编辑 ---------- */
+  const EDITOR_EMPTY = '<div class="empty" style="padding:30px 16px"><p class="t">API 渠道编辑</p><p class="d">点击左侧渠道卡片的「编辑」，或上方「＋ 写作/画图渠道」开始配置。</p></div>';
+
   function renderApis() {
-    const grid = document.getElementById('api-grid');
-    grid.innerHTML = '';
-    const usable = D.apis.filter(a => a.enabled && a.base && a.key && !a.key.includes('••')).map(a => a.id);
-    D.apis.forEach(a => {
-      const isOn = usable.includes(a.id);
-      const isDefault = D.defaultApi === a.id;
-      const card = APP.el(`
-        <div class="api-card">
+    const list = document.getElementById('api-list');
+    if (!list) return;
+    const texts = D.apis.filter(a => a.type !== 'image');
+    const images = D.apis.filter(a => a.type === 'image');
+    const card = a => {
+      const isOn = a.enabled && a.base && a.key && !a.key.includes('••');
+      const isDefault = (a.type === 'image' ? D.defaultImageApi : D.defaultApi) === a.id;
+      return `
+        <div class="api-card" data-id="${a.id}">
           <div class="h">
             <span class="api-badge ${isOn ? 'on' : 'off'}">${isOn ? '可用' : '未启用'}</span>
             <b style="font-family:var(--font-display)">${APP.esc(a.name)}</b>
@@ -167,62 +170,169 @@
               <button class="chip" data-act="del" style="color:var(--coral)">删除</button>
             </div>
           </div>
-        </div>`);
-      grid.appendChild(card);
-      card.querySelector('[data-act=default]').addEventListener('click', () => { APP.store.setDefaultApi(a.id); renderApis(); APP.toast('已设为默认渠道', 'success'); });
-      card.querySelector('[data-act=enable]').addEventListener('click', () => { APP.store.saveApi(a.id, { enabled: !a.enabled }); renderApis(); });
-      card.querySelector('[data-act=edit]').addEventListener('click', () => editApi(a));
-      card.querySelector('[data-act=del]').addEventListener('click', () => {
-        if (!confirm('删除渠道「' + a.name + '」？')) return;
-        APP.store.removeApi(a.id); renderApis(); updateCounts();
-        APP.toast('渠道已删除', 'success');
+        </div>`;
+    };
+    const group = (title, arr) =>
+      `<div class="tpl-group-title">${title} <span class="small muted">${arr.length}</span></div>` +
+      (arr.length ? arr.map(card).join('') : '<div class="empty" style="padding:16px"><p class="d">暂无渠道，点右上角添加。</p></div>');
+    list.innerHTML = group('写作渠道', texts) + group('画图渠道', images);
+
+    list.querySelectorAll('[data-act]').forEach(btn => {
+      const a = D.apis.find(x => x.id === btn.closest('.api-card').dataset.id);
+      if (!a) return;
+      btn.addEventListener('click', () => {
+        const act = btn.dataset.act;
+        if (act === 'default') {
+          APP.store.setDefaultApi(a.id, a.type || 'text');
+          renderApis(); updateCounts();
+          APP.toast('已设为默认' + (a.type === 'image' ? '画图' : '写作') + '渠道', 'success');
+        } else if (act === 'enable') {
+          APP.store.saveApi(a.id, { enabled: !a.enabled });
+          renderApis(); updateCounts();
+        } else if (act === 'edit') {
+          renderApiEditor(a);
+        } else if (act === 'del') {
+          if (!confirm('删除渠道「' + a.name + '」？')) return;
+          APP.store.removeApi(a.id); renderApis(); updateCounts();
+          renderApiEditor(null);
+          APP.toast('渠道已删除', 'success');
+        }
       });
     });
   }
 
-  function editApi(a) {
-    APP.modal({
-      title: '编辑渠道 · ' + a.name,
-      submitText: '保存',
-      bodyHtml: `
-        <div class="field"><label>渠道名称</label><input class="input" name="name" value="${APP.esc(a.name)}"></div>
-        <div class="field"><label>接口地址</label><input class="input" name="base" value="${APP.esc(a.base)}" placeholder="https://api.xxx.com/v1"></div>
-        <div class="field"><label>模型</label><input class="input" name="model" value="${APP.esc(a.model)}" placeholder="deepseek-v3"></div>
-        <div class="field"><label>API Key</label><input class="input" name="key" value="${a.key && !a.key.includes('••') ? a.key : ''}" placeholder="${a.key && a.key.includes('••') ? '已配置（留空保持不变）' : 'sk-…'}"></div>
-        <div class="field"><label>temperature</label><input class="input" type="number" step="0.05" min="0" max="1.5" name="temp" value="${a.temp}"></div>`,
-      onSubmit: (root) => {
-        const f = APP.formData(root);
-        if (!f.name.trim() || !f.base.trim()) { APP.toast('名称与接口地址不能为空', 'warn'); return false; }
-        const key = f.key.trim() || (a.key && !a.key.includes('••') ? a.key : '');
-        APP.store.saveApi(a.id, { name: f.name.trim(), base: f.base.trim(), model: f.model.trim() || '—', key, temp: +f.temp || 0.8, enabled: !!(key && f.base.trim()) });
-        renderApis(); updateCounts();
-        APP.toast('渠道已保存', 'success');
-        return true;
+  /* 表单当前生效的 Key：新填优先，否则用存量（含脱敏占位） */
+  function editorKey(a) {
+    const inp = document.querySelector('#api-editor [name=key]');
+    if (inp && inp.value.trim()) return inp.value.trim();
+    return (a && a.key) || '';
+  }
+
+  function renderApiEditor(a, type) {
+    const pane = document.getElementById('api-editor');
+    if (!pane) return;
+    const isNew = !a;
+    const chType = a ? a.type : (type || 'text');
+    const typeLabel = chType === 'image' ? '画图' : '写作';
+    const hasKey = !!(a && a.key);
+    pane.innerHTML = `
+      <div class="h">
+        <span class="t">${isNew ? '添加' : '编辑'}${typeLabel}渠道</span>
+        ${chType === 'image' ? '<span class="tag tag-lilac" style="font-size:10px">image</span>' : '<span class="tag tag-sun" style="font-size:10px">text</span>'}
+      </div>
+      <div class="field"><label>渠道名称</label><input class="input" name="name" value="${a ? APP.esc(a.name) : ''}" placeholder="例如：主力中转"></div>
+      <div class="field"><label>接口地址</label><input class="input" name="base" value="${a ? APP.esc(a.base) : ''}" placeholder="https://api.xxx.com/v1"></div>
+      <div class="field">
+        <label>API Key</label>
+        <input class="input" name="key" type="password" autocomplete="off" value="" placeholder="${hasKey ? '已配置（留空保持不变）' : 'sk-…'}">
+        <span class="hint">密钥仅保存在本地浏览器，不会上传。</span>
+      </div>
+      <div class="field">
+        <label>模型 <span class="hint">可「拉取模型」自动填充，也可手填</span></label>
+        <input class="input" name="model" list="api-model-list" value="${a && a.model && a.model !== '—' ? APP.esc(a.model) : ''}" placeholder="deepseek-v3">
+        <datalist id="api-model-list"></datalist>
+      </div>
+      <div class="field"><label>temperature</label><input class="input" name="temp" type="number" step="0.05" min="0" max="1.5" value="${a ? a.temp : 0.8}"></div>
+      <div class="api-test-zone">
+        <div class="hint" style="margin-bottom:8px">填写接口地址与 API Key 后，即可拉取模型并测试连通。</div>
+        <div class="flex gap-6">
+          <button class="btn btn-ghost btn-sm" id="btn-fetch-models" disabled>① 拉取模型</button>
+          <button class="btn btn-ghost btn-sm" id="btn-test-conn" disabled>② 测试连通</button>
+        </div>
+        <div id="api-test-result" class="small" style="margin-top:8px;min-height:18px"></div>
+      </div>
+      <div class="flex gap-6" style="margin-top:12px">
+        <button class="btn btn-primary" id="btn-save-api">保存</button>
+        <button class="btn btn-ghost" id="btn-cancel-api">取消</button>
+      </div>`;
+    bindApiEditor(a, chType);
+  }
+
+  function bindApiEditor(a, type) {
+    const pane = document.getElementById('api-editor');
+    const $n = s => pane.querySelector(s);
+    const baseInp = $n('[name=base]');
+    const keyInp = $n('[name=key]');
+    const modelInp = $n('[name=model]');
+    const fetchBtn = $n('#btn-fetch-models');
+    const testBtn = $n('#btn-test-conn');
+    const resultEl = $n('#api-test-result');
+
+    const refreshButtons = () => {
+      const ok = baseInp.value.trim() && (keyInp.value.trim() || (a && a.key));
+      if (fetchBtn) fetchBtn.disabled = !ok;
+      if (testBtn) testBtn.disabled = !ok;
+    };
+    baseInp.addEventListener('input', refreshButtons);
+    keyInp.addEventListener('input', refreshButtons);
+    refreshButtons();
+
+    const showResult = html => { resultEl.innerHTML = html; };
+
+    fetchBtn.addEventListener('click', async () => {
+      const base = baseInp.value.trim();
+      const key = editorKey(a);
+      if (!base || !key) { showResult('<span style="color:var(--coral)">请先填写接口地址与 API Key</span>'); return; }
+      fetchBtn.disabled = true; fetchBtn.textContent = '拉取中…';
+      showResult('正在请求模型列表…');
+      try {
+        const models = await APP.ai.listModels(base, key);
+        const dl = pane.querySelector('#api-model-list');
+        dl.innerHTML = models.map(m => `<option value="${APP.esc(m)}"></option>`).join('');
+        if (!modelInp.value.trim()) modelInp.value = models[0] || '';
+        showResult(`<span style="color:var(--mint)">✓ 拉取成功：${models.length} 个模型，已填入下拉候选${models[0] ? '（默认 ' + APP.esc(models[0]) + '）' : ''}</span>`);
+      } catch (e) {
+        showResult(`<span style="color:var(--coral)">✗ 拉取失败：${APP.esc(e.message)}（可继续手填模型）</span>`);
       }
+      fetchBtn.textContent = '① 拉取模型'; refreshButtons();
+    });
+
+    testBtn.addEventListener('click', async () => {
+      const base = baseInp.value.trim();
+      const key = editorKey(a);
+      const model = modelInp.value.trim() || (a && a.model && a.model !== '—' ? a.model : '');
+      if (!base || !key) { showResult('<span style="color:var(--coral)">请先填写接口地址与 API Key</span>'); return; }
+      testBtn.disabled = true; testBtn.textContent = '测试中…';
+      showResult('正在发送最小请求…');
+      try {
+        const r = await APP.ai.testChannel({ base, key, model, type });
+        showResult(`<span style="color:var(--mint)">✓ 连通成功 · HTTP 200 · ${r.ms}ms${model ? ' · ' + APP.esc(model) : ''}</span>`);
+        APP.toast('渠道连通测试通过', 'success');
+      } catch (e) {
+        showResult(`<span style="color:var(--coral)">✗ 连接失败：${APP.esc(e.message)}</span>`);
+        APP.toast('渠道测试失败', 'warn');
+      }
+      testBtn.textContent = '② 测试连通'; refreshButtons();
+    });
+
+    $n('#btn-cancel-api').addEventListener('click', () => { pane.innerHTML = EDITOR_EMPTY; });
+
+    $n('#btn-save-api').addEventListener('click', () => {
+      const name = $n('[name=name]').value.trim();
+      const base = baseInp.value.trim();
+      if (!name || !base) { APP.toast('名称与接口地址不能为空', 'warn'); return; }
+      const patch = {
+        name, base,
+        model: modelInp.value.trim() || '—',
+        temp: +$n('[name=temp]').value || 0.8
+      };
+      const typedKey = keyInp.value.trim();
+      if (typedKey) patch.key = typedKey;
+      if (a) {
+        APP.store.saveApi(a.id, Object.assign({}, patch, { enabled: !!(typedKey || a.key) && !!base }));
+      } else {
+        patch.type = type;
+        patch.enabled = !!(typedKey && base);
+        APP.store.addApi(patch);
+      }
+      renderApis(); updateCounts();
+      pane.innerHTML = EDITOR_EMPTY;
+      APP.toast(type === 'image' ? '画图渠道已保存' : '渠道已保存', 'success');
     });
   }
 
-  document.getElementById('btn-add-api').addEventListener('click', () => {
-    APP.modal({
-      title: '添加 API 渠道',
-      submitText: '保存',
-      bodyHtml: `
-        <div class="field"><label>渠道名称</label><input class="input" name="name" placeholder="例如：主力中转"></div>
-        <div class="field"><label>接口地址</label><input class="input" name="base" placeholder="https://api.xxx.com/v1"></div>
-        <div class="field"><label>模型</label><input class="input" name="model" placeholder="deepseek-v3"></div>
-        <div class="field"><label>API Key</label><input class="input" name="key" placeholder="sk-…"></div>
-        <div class="field"><label>temperature</label><input class="input" type="number" step="0.05" min="0" max="1.5" name="temp" value="0.8"></div>
-        <p class="hint" style="color:var(--muted)">密钥仅保存在本地浏览器（localStorage），不会上传。</p>`,
-      onSubmit: (root) => {
-        const f = APP.formData(root);
-        if (!f.name.trim() || !f.base.trim()) { APP.toast('名称与接口地址不能为空', 'warn'); return false; }
-        APP.store.addApi({ name: f.name.trim(), base: f.base.trim(), model: f.model.trim() || '—', key: f.key.trim(), enabled: !!(f.key.trim() && f.base.trim()), temp: +f.temp || 0.8 });
-        renderApis(); updateCounts();
-        APP.toast('渠道已添加', 'success');
-        return true;
-      }
-    });
-  });
+  document.getElementById('btn-add-api-text').addEventListener('click', () => renderApiEditor(null, 'text'));
+  document.getElementById('btn-add-api-image').addEventListener('click', () => renderApiEditor(null, 'image'));
 
   /* ---------- 模板导入导出 ---------- */
   document.getElementById('btn-export-tpl').addEventListener('click', () => {
@@ -267,19 +377,24 @@
   const relBtn = document.getElementById('btn-open-releases');
   if (relBtn) relBtn.addEventListener('click', () => APP.updater.openReleases());
 
-  /* ---------- 安全策略开关 ---------- */
+  /* ---------- 安全策略开关（与个人信息页偏好设置同源：user.prefs.aiAutoSend） ---------- */
   const sw = document.getElementById('ai-switch');
-  sw.classList.toggle('on', !!D.user.aiAutoSend);
-  sw.addEventListener('click', () => {
-    D.user.aiAutoSend = !D.user.aiAutoSend;
-    APP.store.save();
-    sw.classList.toggle('on', D.user.aiAutoSend);
-    APP.toast(D.user.aiAutoSend ? 'AI 自动发送已开启' : 'AI 自动发送已关闭', 'success');
-  });
+  const aiSendVal = () => !!(D.user.prefs && D.user.prefs.aiAutoSend);
+  if (sw) {
+    sw.classList.toggle('on', aiSendVal());
+    sw.addEventListener('click', () => {
+      D.user.prefs = D.user.prefs || {};
+      D.user.prefs.aiAutoSend = !aiSendVal();
+      APP.store.save();
+      sw.classList.toggle('on', aiSendVal());
+      APP.toast(D.user.prefs.aiAutoSend ? 'AI 自动发送已开启' : 'AI 自动发送已关闭', 'success');
+    });
+  }
 
   /* ---------- 启动 ---------- */
   renderGroups();
   renderDetail();
   renderApis();
+  renderApiEditor(null);
   updateCounts();
 })();

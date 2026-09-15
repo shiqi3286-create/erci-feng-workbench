@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>晴笺 · AI 小说创作台 — 个人信息</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='7' fill='%23E89B54'/%3E%3Cpath d='M12 5v14M5 12h14' stroke='white' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Quicksand:wght@500;600;700&family=Noto+Sans+SC:wght@400;500;700;900&display=swap">
+<link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/theme-layout.css">
+<link rel="stylesheet" href="assets/css/theme-night.css">
+</head>
+<body data-page="profile">
+
+<header class="app-topbar" id="app-topbar"></header>
+<div class="app-toolbar" id="app-toolbar"></div>
+
+<main class="page-wrap">
+
+  <div class="flex-between mb-14">
+    <h2 class="section-title"><span class="dot"></span>个人信息</h2>
+    <span class="small muted" id="profile-save-tip">修改即时保存</span>
+  </div>
+
+  <div class="profile-shell">
+
+    <!-- 左：头像卡 -->
+    <aside class="card card-pad profile-side">
+      <div class="avatar-big" id="avatar-big" title="点击更换头像">
+        <img id="avatar-img" alt="头像" style="display:none">
+        <span id="avatar-letter" style="display:grid"></span>
+      </div>
+      <div class="profile-name" id="profile-name">作者</div>
+      <div class="small muted" id="profile-signature">—</div>
+      <div class="flex gap-6" style="justify-content:center;margin-top:14px;flex-wrap:wrap">
+        <label class="btn btn-soft btn-sm" style="cursor:pointer">更换头像<input type="file" id="avatar-file" accept="image/*" style="display:none"></label>
+      </div>
+    </aside>
+
+    <!-- 右：内容区 -->
+    <div class="profile-main">
+
+      <!-- 基础资料 -->
+      <section class="card card-pad">
+        <div class="sec-title">基础资料</div>
+        <div class="profile-grid">
+          <div class="field"><label>昵称（首页问候使用）</label><input class="input" id="pf-name" maxlength="12" placeholder="作者"></div>
+          <div class="field"><label>个性签名</label><input class="input" id="pf-signature" maxlength="40" placeholder="一句话介绍自己"></div>
+        </div>
+      </section>
+
+      <!-- 写作统计 -->
+      <section class="card card-pad">
+        <div class="sec-title">写作统计 <span class="small muted" style="font-weight:400">（每日净增字数在保存正文时自动记录）</span></div>
+        <div class="stat-row">
+          <div class="stat-mini"><div class="k">累计字数</div><div class="v" id="st-words">0</div></div>
+          <div class="stat-mini"><div class="k">写作天数</div><div class="v" id="st-days">0</div></div>
+          <div class="stat-mini"><div class="k">连续写作</div><div class="v" id="st-streak">0</div></div>
+          <div class="stat-mini"><div class="k">AI 生成占比</div><div class="v" id="st-ai">0%</div></div>
+        </div>
+        <div class="sec-sub">近 7 天写作量</div>
+        <div class="bar-chart" id="week-chart"></div>
+        <div class="sec-sub">各作品字数分布</div>
+        <div class="dist-list" id="dist-list"></div>
+      </section>
+
+      <!-- 创作目标 -->
+      <section class="card card-pad">
+        <div class="sec-title">创作目标</div>
+        <div class="profile-grid">
+          <div class="field"><label>日更字数目标</label><input class="input" id="pf-goal-daily" type="number" min="0" step="100" placeholder="2000"></div>
+          <div class="field"><label>完结目标（作品名）</label><input class="input" id="pf-goal-finish" maxlength="20" placeholder="例如：星落之森"></div>
+        </div>
+      </section>
+
+      <!-- 偏好设置 -->
+      <section class="card card-pad">
+        <div class="sec-title">偏好设置</div>
+        <div class="profile-grid">
+          <div class="field"><label>编辑器字号</label><input class="input" id="pf-fontsize" type="number" min="13" max="22" step="0.5"></div>
+          <div class="field"><label>行距</label><input class="input" id="pf-lineheight" type="number" min="1.4" max="2.6" step="0.1"></div>
+          <div class="field"><label>自动保存间隔（秒）</label><input class="input" id="pf-autosave" type="number" min="10" max="600" step="10"></div>
+          <div class="field">
+            <label>默认写作渠道</label>
+            <select class="select" id="pf-def-text"></select>
+          </div>
+          <div class="field">
+            <label>默认画图渠道</label>
+            <select class="select" id="pf-def-image"></select>
+          </div>
+          <div class="field">
+            <label>AI 自动发送</label>
+            <div class="flex gap-6" style="margin-top:4px">
+              <span class="small muted" style="flex:1">开启后，指令发送时自动附带选中文本与设定卡片</span>
+              <span class="switch" id="pf-ai-switch"></span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 平台发布偏好 -->
+      <section class="card card-pad">
+        <div class="sec-title">平台发布偏好</div>
+        <div class="profile-grid">
+          <div class="field">
+            <label>目标平台</label>
+            <select class="select" id="pf-platform">
+              <option>番茄小说</option><option>起点中文网</option><option>晋江文学城</option><option>其他</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>章节标题格式</label>
+            <input class="input" id="pf-titlefmt" placeholder="第{no}章 {title}">
+            <span class="hint">{no} 章序号 · {title} 章节名</span>
+          </div>
+          <div class="field">
+            <label>段落缩进</label>
+            <div class="flex gap-6" style="margin-top:4px">
+              <span class="small muted" style="flex:1">导出时每段首行缩进两格</span>
+              <span class="switch" id="pf-indent"></span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 数据安全 -->
+      <section class="card card-pad">
+        <div class="sec-title">数据安全</div>
+        <p class="small muted" style="margin-bottom:12px">全书文稿默认保存在本机。可随时导出全量备份 JSON，或从备份恢复。写入过程中每 10 秒自动保存一份崩溃快照。</p>
+        <div class="flex gap-6" style="flex-wrap:wrap">
+          <button class="btn btn-soft" id="btn-pf-backup">导出全量备份</button>
+          <button class="btn btn-ghost" id="btn-pf-restore">从备份恢复</button>
+          <input type="file" id="pf-restore-file" accept="application/json,.json" style="display:none">
+          <button class="btn btn-ghost" id="btn-pf-snap">从崩溃快照恢复</button>
+        </div>
+        <div class="small" id="snap-hint" style="margin-top:10px"></div>
+      </section>
+
+    </div>
+  </div>
+</main>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/common.js"></script>
+<script src="assets/js/store.js"></script>
+<script src="assets/js/ai.js"></script>
+<script src="assets/js/updater.js"></script>
+<script src="assets/js/profile.js"></script>
+</body>
+</html>

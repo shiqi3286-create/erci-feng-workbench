@@ -1,0 +1,123 @@
+/* ============================================================
+   晴笺 · 夜色星辉主题（夜间模式）
+   通过 body.theme-night 激活；白天为 style.css 默认暖阳主题。
+   引入顺序：style.css → theme-layout.css → theme-night.css
+   ============================================================ */
+
+body.theme-night {
+  /* ---------- 设计令牌覆盖 ---------- */
+  --cream: #151A34;                 /* 页面底色：深夜蓝紫 */
+  --cream-deep: #0E1226;
+  --paper: rgba(31, 39, 71, 0.78);  /* 卡片：深色磨砂玻璃 */
+  --glass: rgba(21, 27, 51, 0.72);
+  --glass-strong: rgba(18, 23, 45, 0.92);
+  --ink: #EDE7DA;                   /* 正文：暖白 */
+  --ink-soft: #C3BBA9;
+  --muted: #8D86A0;
+  --line: rgba(232, 193, 106, 0.20);
+  --line-soft: rgba(232, 193, 106, 0.12);
+
+  --sun: #E8C16A;                   /* 主强调：暖金 */
+  --sun-soft: rgba(232, 193, 106, 0.16);
+  --peach: #D9A0A8;
+  --peach-soft: rgba(217, 160, 168, 0.18);
+  --sky: #8FB8D9;
+  --sky-soft: rgba(143, 184, 217, 0.16);
+  --lilac: #B49BD9;
+  --lilac-soft: rgba(180, 155, 217, 0.16);
+  --mint: #86C49A;
+  --mint-soft: rgba(134, 196, 154, 0.16);
+  --coral: #E08A7E;
+  --coral-soft: rgba(224, 138, 126, 0.16);
+
+  /* 标签前景色：深底提亮，保证对比度 */
+  --tag-sun: #F0B877;
+  --tag-peach: #E8A59A;
+  --tag-sky: #9FC9EA;
+  --tag-lilac: #C4AEEA;
+  --tag-mint: #9BD0AD;
+  --tag-coral: #E89A8E;
+
+  /* 阴影：金色光晕 */
+  --shadow-card: 0 6px 22px rgba(0, 0, 0, 0.28), 0 1px 3px rgba(232, 193, 106, 0.06);
+  --shadow-pop: 0 14px 38px rgba(0, 0, 0, 0.45);
+  --shadow-inset: inset 0 1px 2px rgba(0, 0, 0, 0.28);
+
+  /* 背景：深蓝紫夜空 + 星辉 */
+  background:
+    radial-gradient(900px 520px at 88% -8%, rgba(232, 193, 106, 0.10), transparent 62%),
+    radial-gradient(1000px 620px at -12% 18%, rgba(120, 100, 220, 0.14), transparent 58%),
+    radial-gradient(2px 2px at 12% 30%, rgba(255, 255, 255, 0.5), transparent 55%),
+    radial-gradient(2px 2px at 68% 12%, rgba(255, 255, 255, 0.42), transparent 55%),
+    radial-gradient(1.5px 1.5px at 85% 42%, rgba(232, 193, 106, 0.5), transparent 55%),
+    radial-gradient(1.5px 1.5px at 30% 64%, rgba(255, 255, 255, 0.35), transparent 55%),
+    radial-gradient(2px 2px at 52% 78%, rgba(232, 193, 106, 0.35), transparent 55%),
+    linear-gradient(160deg, #151A34, #0E1226);
+  background-attachment: fixed;
+  color: var(--ink);
+}
+
+/* ---------- 滚动条 ---------- */
+body.theme-night ::-webkit-scrollbar-thumb { background: rgba(232, 193, 106, 0.28); }
+body.theme-night ::-webkit-scrollbar-thumb:hover { background: rgba(232, 193, 106, 0.42); }
+
+/* ---------- 选择 ---------- */
+body.theme-night ::selection { background: rgba(232, 193, 106, 0.30); }
+
+/* ---------- 下拉箭头（原 data-uri 固定深色） ---------- */
+body.theme-night .select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23E8C16A' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+}
+
+/* ---------- 组件硬编码色覆盖 ---------- */
+body.theme-night .switch { background: rgba(255, 255, 255, 0.14); }
+body.theme-night .switch.on { background: var(--mint); }
+body.theme-night .progress { background: rgba(255, 255, 255, 0.08); }
+body.theme-night .progress > i { background: linear-gradient(90deg, var(--sun), var(--peach)); }
+body.theme-night .tree-group > .tree-title .count { background: rgba(255, 255, 255, 0.08); color: var(--muted); }
+body.theme-night .trace-step.todo .st-ico { background: rgba(255, 255, 255, 0.12); }
+body.theme-night .trace-bar { background: rgba(15, 20, 40, 0.55); }
+body.theme-night .side-search .input { background: rgba(15, 20, 40, 0.55); }
+body.theme-night .tk-bar { background: rgba(255, 255, 255, 0.10); }
+body.theme-night .new-book-card { border-color: rgba(232, 193, 106, 0.35); background: rgba(31, 39, 71, 0.35); }
+body.theme-night .new-book-card:hover { border-color: var(--sun); background: rgba(232, 193, 106, 0.12); }
+body.theme-night .tag-mute { background: rgba(255, 255, 255, 0.09); color: var(--muted); }
+body.theme-night .api-badge.off { background: rgba(255, 255, 255, 0.09); color: var(--muted); }
+body.theme-night .bar-val { background: rgba(255, 255, 255, 0.10); }
+body.theme-night .dist-bar { background: rgba(255, 255, 255, 0.10); }
+body.theme-night .stat-mini { background: rgba(24, 30, 58, 0.6); border-color: var(--line-soft); }
+body.theme-night .modal-overlay { background: rgba(5, 8, 22, 0.60); }
+body.theme-night .book-del { background: rgba(18, 23, 45, 0.92); }
+body.theme-night .book-cover-btn { background: rgba(18, 23, 45, 0.92); }
+body.theme-night .book-cover .overlay { background: linear-gradient(180deg, transparent 55%, rgba(8, 12, 28, 0.72)); }
+
+/* 正文：AI 标记金色，选中高亮 */
+body.theme-night .doc-content .ai-mark {
+  background: linear-gradient(180deg, transparent 62%, rgba(232, 193, 106, 0.30) 62%);
+}
+body.theme-night .doc-content .fs-tag { color: var(--sun); background: rgba(232, 193, 106, 0.14); }
+
+/* 欢迎横幅（夜间固定深色星空渐变，保证对比度） */
+body.theme-night #hero-banner {
+  background:
+    radial-gradient(600px 200px at 90% 0%, rgba(232, 193, 106, 0.14), transparent 60%),
+    linear-gradient(160deg, rgba(26, 33, 66, 0.9), rgba(16, 21, 44, 0.94)) !important;
+}
+
+/* 状态栏 / 指令区玻璃加深 */
+body.theme-night .status-bar,
+body.theme-night .cmd-bar { background: rgba(15, 20, 40, 0.78); }
+
+/* 头像渐变与标签对比度微调 */
+body.theme-night .avatar { border-color: rgba(21, 27, 51, 0.9); }
+body.theme-night .portrait { border-color: rgba(31, 39, 71, 0.9); }
+
+/* 全局搜索悬停 / 侧栏激活沿用变量，微调文字 */
+body.theme-night .nav-item:hover { background: rgba(232, 193, 106, 0.10); color: var(--ink); }
+body.theme-night .nav-item.active { background: var(--sun); color: #201A10; box-shadow: 0 3px 12px rgba(232, 193, 106, 0.35); }
+body.theme-night .icon-btn:hover { background: rgba(232, 193, 106, 0.12); }
+
+/* Toast 适配夜间 */
+body.theme-night .toast { background: rgba(10, 14, 32, 0.94); color: #F5EFE2; }
+body.theme-night .toast.success { background: rgba(54, 96, 66, 0.94); }
+body.theme-night .toast.warn { background: rgba(128, 66, 56, 0.94); }

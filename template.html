@@ -7,15 +7,17 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='7' fill='%23E89B54'/%3E%3Cpath d='M12 5v14M5 12h14' stroke='white' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Quicksand:wght@500;600;700&family=Noto+Sans+SC:wght@400;500;700;900&display=swap">
 <link rel="stylesheet" href="assets/css/style.css">
+<link rel="stylesheet" href="assets/css/theme-layout.css">
+<link rel="stylesheet" href="assets/css/theme-night.css">
 <style>
   .tpl-shell { display: grid; grid-template-columns: 1fr 400px; gap: 18px; align-items: start; }
   @media (max-width: 1000px) { .tpl-shell { grid-template-columns: 1fr; } }
-  .api-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
 </style>
 </head>
 <body data-page="template">
 
 <header class="app-topbar" id="app-topbar"></header>
+<div class="app-toolbar" id="app-toolbar"></div>
 
 <main class="page-wrap">
 
@@ -37,13 +39,19 @@
     <aside class="detail-pane" id="tpl-detail"></aside>
   </div>
 
-  <!-- API 渠道 -->
+  <!-- API 渠道：左列表（写作/画图分组） + 右内联编辑面板 -->
   <div class="flex-between mb-14">
     <h2 class="section-title"><span class="dot"></span>API 渠道 <span class="tag tag-mint" style="margin-left:6px" id="api-count">0 / 0 可用</span></h2>
-    <button class="btn btn-primary" id="btn-add-api">＋ 添加渠道</button>
+    <div class="flex gap-6">
+      <button class="btn btn-soft" id="btn-add-api-text">＋ 写作渠道</button>
+      <button class="btn btn-soft" id="btn-add-api-image">＋ 画图渠道</button>
+    </div>
   </div>
 
-  <section class="api-grid" id="api-grid"></section>
+  <div class="tpl-shell mb-20">
+    <section id="api-list"></section>
+    <aside class="detail-pane" id="api-editor"></aside>
+  </div>
 
   <div class="card card-pad mt-20" style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">
     <div style="flex:1;min-width:220px">

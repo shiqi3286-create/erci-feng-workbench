@@ -14,6 +14,15 @@
 
   const statusMap = { done: ['tag-mint', '已完结'], writing: ['tag-sun', '写作中'], todo: ['tag-mute', '待写'] };
 
+  /* 章节正文信息：内存优先，懒加载后读字数缓存（§12-1） */
+  function chapterBodyInfo(b) {
+    if (b.paras && b.paras.length) {
+      return { hasBody: true, words: b.paras.reduce((s, x) => s + (x.text || '').length, 0) };
+    }
+    const c = D.stats && D.stats.chapterWords && D.stats.chapterWords[b.id];
+    return { hasBody: !!(c && c.words > 0), words: c ? c.words : 0 };
+  }
+
   /* ---------- 左：分卷列表 ---------- */
   function renderVols() {
     const list = document.getElementById('vol-list');
@@ -58,7 +67,7 @@
 
     vol.beats.forEach((b, i) => {
       const [cls, label] = statusMap[b.status] || statusMap.todo;
-      const hasBody = b.paras && b.paras.length;
+      const hasBody = chapterBodyInfo(b).hasBody;
       const card = APP.el(`
         <article class="beat-card ${b.id === activeBeat ? 'active' : ''}" data-b="${b.id}" draggable="true" style="${b.id === activeBeat ? 'box-shadow:0 0 0 3px rgba(232,155,84,.2),var(--shadow-card)' : ''}">
           <div class="row1">
@@ -132,7 +141,7 @@
       volumeId: activeVol,
       chapterId: b.id,
       chapterTitle: '第' + b.no + '章 · ' + b.title,
-      chapterWords: (b.paras || []).reduce((s, x) => s + (x.text || '').length, 0),
+      chapterWords: chapterBodyInfo(b).words,
       chapterOrder: +b.no,
       modifiedCount: b.modifiedCount || 0
     };
@@ -173,7 +182,7 @@
       <div class="sec">
         <div class="st">AI 操作</div>
         <div style="display:flex;flex-direction:column;gap:8px">
-          <button class="btn btn-primary btn-block" id="btn-detail-body">${(b.paras && b.paras.length) ? '去写作区继续写' : '生成本章正文'}</button>
+          <button class="btn btn-primary btn-block" id="btn-detail-body">${chapterBodyInfo(b).hasBody ? '去写作区继续写' : '生成本章正文'}</button>
           <button class="btn btn-ghost btn-block" id="btn-detail-expand">扩写大纲卡片</button>
           <button class="btn btn-ghost btn-block" id="btn-detail-branch">生成剧情分支</button>
         </div>
@@ -188,7 +197,7 @@
       </div>`;
 
     $('#btn-detail-body').addEventListener('click', () => {
-      if (b.paras && b.paras.length) { openBeatInWorkspace(b); return; }
+      if (chapterBodyInfo(b).hasBody) { openBeatInWorkspace(b); return; }
       genChapterBody(b);
     });
     $('#btn-detail-expand').addEventListener('click', () => expandBeat(b));

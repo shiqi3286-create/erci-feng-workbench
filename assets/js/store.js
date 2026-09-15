@@ -12,6 +12,8 @@ window.APP = window.APP || {};
 window.APP.store = (function () {
 
   const KEY = 'novel-studio:data:v1';
+  const SNAP_KEY = KEY + ':snap';
+  const DIRTY_KEY = KEY + ':dirty';
   const SCOPED = ['volumes', 'characters', 'locations', 'items', 'foreshadows', 'timeline'];
   const tauriInvoke = () => window.__TAURI__?.core?.invoke || window.__TAURI_INTERNALS__?.invoke;
 
@@ -82,18 +84,46 @@ window.APP.store = (function () {
     return JSON.stringify(clone);
   }
 
+  /* ---------- 章节字数缓存（迁移后正文不进主存储，统计走缓存） ---------- */
+  function statsEnsure() {
+    const D = window.DATA;
+    D.stats = D.stats || {};
+    D.stats.chapterWords = D.stats.chapterWords || {};
+    return D.stats.chapterWords;
+  }
+  function chapterCalc(b) {
+    let words = 0, ai = 0;
+    (b.paras || []).forEach(x => {
+      const n = (x.text || '').length;
+      words += n;
+      if ((x.cls || '').includes('ai-mark')) ai += n;
+    });
+    return { words, ai };
+  }
+  /* 项目实际字数：当前章读内存，其余章节读缓存 */
+  function projectWordsCalc(pid) {
+    const pd = projectData(pid);
+    const cw = statsEnsure();
+    const cur = window.DATA.current;
+    let words = 0, ai = 0;
+    pd.volumes.forEach(v => (v.beats || []).forEach(b => {
+      const inMem = cur && cur.projectId === pid && cur.chapterId === b.id && Array.isArray(b.paras) && b.paras.length;
+      let c;
+      if (inMem) { c = chapterCalc(b); cw[b.id] = c; }
+      else c = cw[b.id] || { words: 0, ai: 0 };
+      words += c.words; ai += c.ai;
+    }));
+    return { words, ai };
+  }
+
   /* ---------- 项目统计同步 ---------- */
   function syncStats() {
     const p = currentProject();
     if (!p) return;
     const pd = projectData(p.id);
-    let words = 0, chapters = 0;
-    pd.volumes.forEach(v => (v.beats || []).forEach(b => {
-      chapters++;
-      (b.paras || []).forEach(x => { words += (x.text || '').length; });
-    }));
+    const { words } = projectWordsCalc(p.id);
     p.words = words;
-    p.chapters = chapters;
+    p.chapters = pd.volumes.reduce((s, v) => s + (v.beats || []).length, 0);
     p.volumes = pd.volumes.length;
     p.progress = Math.min(1, words / (p.targetWords || 100000));
     p.updated = new Date().toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -102,6 +132,7 @@ window.APP.store = (function () {
 
   /* ---------- 持久化 ---------- */
   let diskTimer = null;
+  let baselineWords = null;   // 首次 save 时的总字数基线，吞掉种子/存档的字数口径差异
   function syncDisk() {
     if (!isDesktop()) return;
     clearTimeout(diskTimer);
@@ -109,6 +140,75 @@ window.APP.store = (function () {
       try { invoke('save_store', { data: serialize() }).catch(() => {}); } catch (e) { /* 桌面落盘失败不影响本地缓存 */ }
     }, 500);
   }
+
+  /* ---------- 写作统计：每日净增字数落库 ---------- */
+  function localDate(d) {
+    d = d || new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function totalWords() {
+    return (window.DATA.projects || []).reduce((s, p) => s + (p.words || 0), 0);
+  }
+  function userStats() {
+    const u = window.DATA.user = window.DATA.user || {};
+    u.stats = u.stats || {};
+    u.stats.daily = u.stats.daily || {};
+    return u.stats;
+  }
+  /* 当天净增字数（写入统计，供 profile 展示） */
+  function recordDailyDelta(delta) {
+    if (!delta) return;
+    const st = userStats();
+    const t = localDate();
+    st.daily[t] = (st.daily[t] || 0) + delta;
+    st.lastWritten = t;
+  }
+  function writingDays() { return Object.keys(userStats().daily).length; }
+  /* 连续写作天数：今天有记录从今天起算，今天没有则从昨天起算 */
+  function streakDays() {
+    const daily = userStats().daily;
+    const d = new Date();
+    let count = 0;
+    for (let i = 0; i < 3650; i++) {
+      const key = localDate(d);
+      if (daily[key] !== undefined) { count++; d.setDate(d.getDate() - 1); }
+      else if (i === 0) { d.setDate(d.getDate() - 1); }
+      else break;
+    }
+    return count;
+  }
+  /* 近 7 天（含今天）写作量，供趋势图 */
+  function last7Days() {
+    const daily = userStats().daily;
+    const out = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(); d.setDate(d.getDate() - i);
+      const key = localDate(d);
+      out.push({ date: key, label: (d.getMonth() + 1) + '/' + d.getDate(), words: daily[key] || 0 });
+    }
+    return out;
+  }
+  /* AI 生成字数占比：正文中带 ai-mark 的段落字数 / 全书总字数（缓存 + 当前章内存） */
+  function aiShare() {
+    const cw = statsEnsure();
+    const cur = window.DATA.current;
+    let total = 0, ai = 0;
+    Object.values(window.DATA.projectData || {}).forEach(pd => {
+      (pd.volumes || []).forEach(v => (v.beats || []).forEach(b => {
+        const inMem = cur && cur.chapterId === b.id && Array.isArray(b.paras) && b.paras.length;
+        let c;
+        if (inMem) { c = chapterCalc(b); cw[b.id] = c; }
+        else c = cw[b.id];
+        if (c) { total += c.words; ai += c.ai; }
+      }));
+    });
+    return total ? Math.round(ai / total * 100) : 0;
+  }
+  /* 各作品实际字数（写作统计卡 / 分布） */
+  function projectWordsAll() {
+    return (window.DATA.projects || []).map(p => ({ id: p.id, title: p.title, words: p.words || 0, status: p.status }));
+  }
+
   function init(DATA) {
     window.DATA = DATA;
     let hasLocal = false;
@@ -121,6 +221,13 @@ window.APP.store = (function () {
       }
     } catch (e) { /* 存档损坏则回退到示例数据 */ }
     const D = window.DATA;
+    /* 旧版存档迁移：user 偏好字段归位 */
+    D.user = D.user || {};
+    if (D.user.autoSave !== undefined && D.user.prefs === undefined) D.user.prefs = {};
+    if (D.user.prefs) {
+      if (D.user.prefs.autoSaveSec === undefined && D.user.autoSave !== undefined) D.user.prefs.autoSaveSec = D.user.autoSave;
+      if (D.user.prefs.aiAutoSend === undefined && D.user.aiAutoSend !== undefined) D.user.prefs.aiAutoSend = !!D.user.aiAutoSend;
+    }
     /* 旧版存档迁移：顶层集合挂到当前项目名下 */
     if (!D.projectData) {
       D.projectData = {};
@@ -130,6 +237,17 @@ window.APP.store = (function () {
     }
     D.projects.forEach(p => projectData(p.id));
     useProject((D.current && D.current.projectId) || (D.projects[0] && D.projects[0].id));
+    /* 崩溃恢复（§12-2）：dirty 标记残留 = 上次写入未完成 */
+    try { if (localStorage.getItem(DIRTY_KEY)) D.snapAvailable = true; } catch (e) { /* 忽略 */ }
+    /* 章节懒加载迁移（§12-1 P0）：正文拆成每章 bundle，主存储瘦身 */
+    migrateBundles().then(migrated => {
+      if (migrated) {
+        const curP = currentProject();
+        if (curP && window.DATA.current && window.DATA.current.chapterId) {
+          /* 迁移后当前章正文已被保留在内存，无需重载；但统计以缓存为准已由 syncStats 处理 */
+        }
+      }
+    });
     save();
     /* 桌面端：本地缓存为空时从磁盘恢复 */
     if (isDesktop() && !hasLocal) {
@@ -140,6 +258,7 @@ window.APP.store = (function () {
           Object.keys(D).forEach(k => { if (obj[k] !== undefined) D[k] = obj[k]; });
           D.projects.forEach(p => projectData(p.id));
           useProject((D.current && D.current.projectId) || (D.projects[0] && D.projects[0].id));
+          migrateBundles();
           readyCbs.splice(0).forEach(cb => { try { cb(); } catch (e) { /* 单页渲染失败不阻塞 */ } });
         } catch (e) { /* 磁盘存档损坏则忽略 */ }
       }).catch(() => {});
@@ -148,10 +267,79 @@ window.APP.store = (function () {
   }
   function save() {
     try {
+      const prevTotal = totalWords();
       syncStats();
+      const nowTotal = totalWords();
+      /* 首次数值基线：种子/存档与实算口径不一致，吞掉这次差异 */
+      if (baselineWords === null) baselineWords = nowTotal;
+      else if (nowTotal !== prevTotal) recordDailyDelta(nowTotal - prevTotal);
+      /* 崩溃恢复：写主键前打 dirty 标记，写完清除；异常退出时标记残留 */
+      setDirty();
       localStorage.setItem(KEY, serialize());
+      clearDirty();
     } catch (e) { /* 存储满或隐私模式：静默失败 */ }
     syncDisk();
+    autoSnapshot();
+  }
+
+  /* ---------- 崩溃恢复自动快照（§12-2） ---------- */
+  let lastSnapAt = 0;
+  function setDirty() { try { localStorage.setItem(DIRTY_KEY, '1'); } catch (e) { /* 忽略 */ } }
+  function clearDirty() { try { localStorage.removeItem(DIRTY_KEY); } catch (e) { /* 忽略 */ } }
+  function autoSnapshot() {
+    const now = Date.now();
+    if (now - lastSnapAt < 10000) return;   // 10s 节流
+    lastSnapAt = now;
+    try { localStorage.setItem(SNAP_KEY, serialize()); } catch (e) { /* 存储满则跳过本轮 */ }
+    if (isDesktop()) { try { invoke('save_snapshot', { data: serialize() }).catch(() => {}); } catch (e) { /* 桌面快照失败不阻塞 */ } }
+  }
+  /** 从自动快照恢复（覆盖当前数据），桌面优先读磁盘快照 */
+  async function restoreSnapshot() {
+    let s = null;
+    if (isDesktop()) {
+      try { s = await invoke('load_snapshot'); } catch (e) { s = null; }
+    }
+    if (!s) {
+      try { s = localStorage.getItem(SNAP_KEY); } catch (e) { s = null; }
+    }
+    if (!s) throw new Error('没有可用的自动快照');
+    const obj = JSON.parse(s);
+    if (!obj || !Array.isArray(obj.projects)) throw new Error('快照文件结构不正确');
+    Object.keys(window.DATA).forEach(k => { if (obj[k] !== undefined) window.DATA[k] = obj[k]; });
+    window.DATA.projects.forEach(p => projectData(p.id));
+    useProject((window.DATA.current && window.DATA.current.projectId) || (window.DATA.projects[0] && window.DATA.projects[0].id));
+    save();
+    clearDirty();
+    return true;
+  }
+
+  /* ---------- 章节懒加载迁移（§12-1 P0）：一章一 bundle，正文不进主存储 ---------- */
+  async function migrateBundles() {
+    const D = window.DATA;
+    D.meta = D.meta || {};
+    if (D.meta.bundlesMigrated) return false;
+    const cw = statsEnsure();
+    const cur = D.current;
+    let moved = 0;
+    const tasks = [];
+    Object.entries(D.projectData || {}).forEach(([pid, pd]) => {
+      (pd.volumes || []).forEach(v => (v.beats || []).forEach(b => {
+        if (!Array.isArray(b.paras) || !b.paras.length) {
+          if (b.paras && b.paras.length === 0) { cw[b.id] = { words: 0, ai: 0 }; }
+          return;
+        }
+        const isCurrent = cur && cur.projectId === pid && cur.chapterId === b.id;
+        const bundle = chapterBundle(b);
+        cw[b.id] = chapterCalc(b);
+        tasks.push(Promise.resolve(saveChapterBundle(pid, v.id, b.id, bundle)).catch(() => {}));
+        if (!isCurrent) b.paras = [];   // 只保留当前章节正文在内存
+        moved++;
+      }));
+    });
+    await Promise.all(tasks);
+    D.meta.bundlesMigrated = true;
+    save();
+    return moved > 0;
   }
 
   /* ---------- 备份 / 恢复 ---------- */
@@ -182,13 +370,27 @@ window.APP.store = (function () {
   }
   function removeProject(id) {
     window.DATA.projects = window.DATA.projects.filter(p => p.id !== id);
-    if (window.DATA.projectData) delete window.DATA.projectData[id];
+    if (window.DATA.projectData) {
+      /* 清理该作品的章节字数缓存 */
+      const cw = window.DATA.stats && window.DATA.stats.chapterWords;
+      if (cw) {
+        window.DATA.projectData[id].volumes.forEach(v => (v.beats || []).forEach(b => delete cw[b.id]));
+      }
+      delete window.DATA.projectData[id];
+    }
     const c = window.DATA.current;
     if (c && c.projectId === id) {
       const next = window.DATA.projects[0];
       useProject(next ? next.id : '');
     }
     save();
+  }
+  function updateProject(id, patch) {
+    const p = window.DATA.projects.find(x => x.id === id);
+    if (!p) return;
+    Object.assign(p, patch);
+    save();
+    return p;
   }
 
   /* ---------- 大纲 ---------- */
@@ -223,6 +425,7 @@ window.APP.store = (function () {
     const b = findBeat(volumeId, beatId);
     if (!b) return;
     Object.assign(b, patch);
+    if (patch.paras !== undefined) statsEnsure()[beatId] = chapterCalc(b);
     const vol = window.DATA.volumes.find(v => v.id === volumeId);
     if (vol) {
       vol.chapters = vol.beats.length;
@@ -237,6 +440,7 @@ window.APP.store = (function () {
     vol.chapters = vol.beats.length;
     vol.done = vol.beats.filter(x => x.status === 'done').length;
     vol.beats.forEach((b, i) => { b.no = String(i + 1).padStart(2, '0'); });
+    if (window.DATA.stats && window.DATA.stats.chapterWords) delete window.DATA.stats.chapterWords[beatId];
     const c = _current();
     if (c && c.chapterId === beatId) { c.volumeId = ''; c.chapterId = ''; c.chapterTitle = ''; }
     save();
@@ -319,6 +523,7 @@ window.APP.store = (function () {
     const b = findBeat(volumeId, beatId);
     if (!b) return;
     b.paras = paras;
+    statsEnsure()[beatId] = chapterCalc(b);
     const words = paras.reduce((s, p) => s + (p.text || '').length, 0);
     if (_current() && _current().chapterId === beatId) _current().chapterWords = words;
     save();
@@ -404,6 +609,74 @@ window.APP.store = (function () {
     }
     return null;
   }
+  /* ---------- 本地规则校验（§12-3，零 token 成本） ---------- */
+  function countOcc(texts, name) {
+    let cnt = 0;
+    texts.forEach(t => { let i = 0; while ((i = t.indexOf(name, i)) !== -1) { cnt++; i += name.length; } });
+    return cnt;
+  }
+  function fsKeywords(text) {
+    const clean = String(text || '').replace(/[「」『』《》【】，。！？、：；·—…\s"'“”‘’（）()]/g, '');
+    if (!clean) return [];
+    const kws = [clean];
+    for (let len = 4; len >= 2; len--) if (clean.length > len) kws.push(clean.slice(0, len));
+    return kws.filter(Boolean);
+  }
+  /** 一致性扫描：here（当前章内存）/ all（全书逐章从 bundle 拉取，用后释放） */
+  async function scanLocal(scope) {
+    const D = window.DATA;
+    const cur = D.current || {};
+    const texts = [];
+    const loaded = [];
+    if (scope === 'all') {
+      for (const [pid, pd] of Object.entries(D.projectData || {})) {
+        for (const v of pd.volumes || []) {
+          for (const b of v.beats || []) {
+            const inMem = cur && cur.projectId === pid && cur.chapterId === b.id && Array.isArray(b.paras) && b.paras.length;
+            if (inMem) { texts.push(...b.paras.map(x => x.text || '')); continue; }
+            try {
+              const bundle = await loadChapterBundle(pid, v.id, b.id);
+              texts.push(bundle ? bundle.content : '');
+              const ref = findBeat(v.id, b.id);
+              if (ref) loaded.push(ref);
+            } catch (e) { /* 跳过读不到的章节 */ }
+          }
+        }
+      }
+    } else {
+      texts.push(...((findBeat(cur.volumeId, cur.chapterId)?.paras) || []).map(x => x.text || ''));
+    }
+    const label = scope === 'all' ? '全书' : '本章';
+    const results = [];
+    if (!texts.length) return results;
+    const full = texts.join('\n');
+    const seen = new Set();
+    const push = (type, text, kind) => {
+      const key = type + text;
+      if (seen.has(key)) return;
+      seen.add(key);
+      results.push({ type, text, kind });
+    };
+    /* 1. 人物出现 */
+    (D.characters || []).filter(c => (c.name || '').length >= 2).forEach(c => {
+      if (countOcc(texts, c.name) === 0) push('一致性', '设定人物「' + c.name + '」在' + label + '正文中未出现', 'char');
+    });
+    /* 2. 地点 / 物品名词统一 */
+    [...(D.locations || []).map(l => l.name), ...(D.items || []).map(i => i.name)]
+      .filter(n => n && n.length >= 2)
+      .forEach(n => { if (countOcc(texts, n) === 0) push('名词统一', '设定「' + n + '」在' + label + '正文中未出现，请核对是否用了其他写法', 'noun'); });
+    /* 3. 未回收伏笔的呼应线索 */
+    (D.foreshadows || []).filter(f => f.status === 'open').forEach(f => {
+      const kws = fsKeywords(f.text);
+      if (!kws.length) return;
+      const hit = kws.some(k => full.includes(k));
+      if (!hit) push('伏笔', '未回收伏笔「' + f.text + '」在' + label + '中没有出现关键词线索，留意后续呼应', 'fs');
+    });
+    /* 用完释放非当前章正文，保持懒加载 */
+    loaded.forEach(b => { b.paras = []; });
+    return results;
+  }
+
   function saveTemplate(id, { name, desc, prompt, vars, params }) {
     const hit = findTpl(id);
     if (!hit) return;
@@ -459,15 +732,41 @@ window.APP.store = (function () {
     save();
   }
   function addApi(api) {
-    window.DATA.apis.push({ id: 'a' + Date.now().toString(36), used: 0, quota: '—', ...api });
+    window.DATA.apis.push({ id: 'a' + Date.now().toString(36), type: api.type || 'text', used: 0, quota: '—', ...api });
     save();
+    return window.DATA.apis[window.DATA.apis.length - 1];
   }
   function removeApi(id) {
     window.DATA.apis = window.DATA.apis.filter(x => x.id !== id);
     if (window.DATA.defaultApi === id) window.DATA.defaultApi = '';
+    if (window.DATA.defaultImageApi === id) window.DATA.defaultImageApi = '';
     save();
   }
-  function setDefaultApi(id) { window.DATA.defaultApi = id; save(); }
+  /* 默认渠道按类型分别设置：text → defaultApi，image → defaultImageApi */
+  function setDefaultApi(id, type) {
+    const a = window.DATA.apis.find(x => x.id === id);
+    const t = (type || (a && a.type) || 'text') === 'image' ? 'image' : 'text';
+    if (t === 'image') window.DATA.defaultImageApi = id;
+    else window.DATA.defaultApi = id;
+    save();
+  }
+
+  /* ---------- 用户资料（profile.html） ---------- */
+  function updateUser(patch) {
+    const u = window.DATA.user = window.DATA.user || {};
+    Object.keys(patch || {}).forEach(k => {
+      const v = patch[k];
+      if (v && typeof v === 'object' && !Array.isArray(v)) u[k] = Object.assign(u[k] || {}, v);
+      else u[k] = v;
+    });
+    save();
+    return u;
+  }
+  function defaultChannelFor(type) {
+    const t = type === 'image' ? 'image' : 'text';
+    const id = t === 'image' ? window.DATA.defaultImageApi : window.DATA.defaultApi;
+    return window.DATA.apis.find(a => a.id === id) || null;
+  }
   function bumpCall(channelId, tokens, model) {
     const a = window.DATA.apis.find(x => x.id === channelId);
     if (a) {
@@ -489,10 +788,11 @@ window.APP.store = (function () {
     isDesktop, invoke, onReady,
     projectData, useProject, syncStats,
     chapterBundle, applyChapterBundle, loadChapterBundle, saveChapterBundle,
-    createChapterSnapshot, restoreChapterSnapshot,
+    createChapterSnapshot, restoreChapterSnapshot, migrateBundles,
+    restoreSnapshot,
     currentVol, currentBeat, currentProject, findBeat,
     exportAll, restoreAll,
-    addProject, removeProject,
+    addProject, removeProject, updateProject,
     addVolume, removeVolume, addBeat, updateBeat, removeBeat, moveBeat,
     setChapterParas, saveChapter, confirmPara, touchChapter,
     addChar, confirmChar, updateChar, removeChar,
@@ -501,6 +801,9 @@ window.APP.store = (function () {
     addForeshadow, updateForeshadow, removeForeshadow,
     addTimeline, updateTimeline, removeTimeline,
     saveTemplate, addTemplate, deleteTemplate, findTpl, importTemplates,
-    saveApi, addApi, removeApi, setDefaultApi, bumpCall
+    saveApi, addApi, removeApi, setDefaultApi, defaultChannelFor, bumpCall,
+    updateUser,
+    localDate, writingDays, streakDays, last7Days, aiShare, projectWordsAll,
+    scanLocal
   };
 })();
