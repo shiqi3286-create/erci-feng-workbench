@@ -1,6 +1,6 @@
 [package]
 name = "erci-feng-workbench"
-version = "0.5.0"
+version = "0.5.1"
 description = "二次风工作台 · AI 小说创作台"
 authors = ["shiqi3286-create"]
 edition = "2021"

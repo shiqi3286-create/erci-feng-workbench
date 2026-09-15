@@ -177,8 +177,8 @@
       chapterOrder: +beat.no,
       modifiedCount: beat.modifiedCount || 0
     };
-    APP.store.save();
     if (prevBeat && prevId !== beatId) prevBeat.paras = [];
+    APP.store.save();
     selectedPara = null;
     dirty = false;
     renderSide(activeTab, $('#side-search-input').value);
@@ -375,12 +375,12 @@
   async function saveNow(showToast = true) {
     const beat = currentBeat();
     if (!beat) return true;
+    if (!dirty) return true;
     const cur = D.current;
-    APP.store.setChapterParas(cur.volumeId, cur.chapterId, beat.paras);
     beat.modifiedCount = (beat.modifiedCount || 0) + 1;
     cur.modifiedCount = beat.modifiedCount;
     $('#st-mod').textContent = beat.modifiedCount;
-    APP.store.touchChapter(cur.volumeId, cur.chapterId, { modified: 0 });
+    APP.store.setChapterParas(cur.volumeId, cur.chapterId, beat.paras);
     /* 记录上次写到位置（作品卡片展示） */
     const proj = APP.store.currentProject();
     if (proj && cur.chapterTitle) proj.lastChapter = cur.chapterTitle;
@@ -848,8 +848,15 @@
     }
   }
 
-  /* ================= 自动保存（60s） ================= */
-  setInterval(() => { if (dirty) saveNow(false); }, 60000);
+  /* ================= 自动保存 ================= */
+  let autoSaveTimer = null;
+  function resetAutoSaveTimer() {
+    if (autoSaveTimer) clearInterval(autoSaveTimer);
+    const raw = Number(D.user && D.user.prefs && D.user.prefs.autoSaveSec);
+    const seconds = Number.isFinite(raw) ? Math.min(3600, Math.max(10, raw)) : 60;
+    autoSaveTimer = setInterval(() => { if (dirty) saveNow(false); }, seconds * 1000);
+  }
+  resetAutoSaveTimer();
 
   /* ================= 启动 ================= */
   renderSide('outline');

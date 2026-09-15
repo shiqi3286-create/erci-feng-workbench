@@ -27,12 +27,13 @@
   function renderVols() {
     const list = document.getElementById('vol-list');
     list.innerHTML = '';
-    D.volumes.forEach(v => {
+    D.volumes.forEach((v, volumeIndex) => {
       const pct = v.chapters ? Math.round(v.done / v.chapters * 100) : 0;
+      const volumeNo = (String(v.title || '').match(/\d+/) || [String(volumeIndex + 1)])[0];
       const item = APP.el(`
         <div class="vol-item ${v.id === activeVol ? 'active' : ''}" data-v="${v.id}">
           <div class="row">
-            <span class="mono" style="width:26px;color:var(--sun);font-weight:700">V${v.title.replace(/^第.卷\s*·\s*/, '').replace(/[^0-9]/g, '') || '·'}</span>
+            <span class="mono" style="width:26px;color:var(--sun);font-weight:700">V${volumeNo}</span>
             <span class="grow">${APP.esc(v.title)}</span>
             <span class="small muted mono">${v.done}/${v.chapters}</span>
           </div>

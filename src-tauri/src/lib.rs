@@ -50,6 +50,8 @@ pub fn run() {
             storage::get_app_data_dir,
             storage::save_store,
             storage::load_store,
+            storage::save_snapshot,
+            storage::load_snapshot,
             storage::list_projects,
             storage::load_project,
             storage::save_project,
@@ -60,9 +62,6 @@ pub fn run() {
             storage::save_chapter_bundle,
             storage::create_snapshot,
             storage::restore_snapshot,
-            storage::search_project,
-            storage::export_project,
-            app_version,
             open_release_page
         ])
         .setup(|app| {

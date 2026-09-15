@@ -9,7 +9,7 @@ fn data_root(app: &AppHandle) -> Result<PathBuf, String> {
 }
 
 fn safe_id(id: &str) -> Result<&str, String> {
-    if id.is_empty() || id.chars().any(|c| matches!(c, '/' | '\\' | ':')) || id == "." || id == ".." {
+    if id.is_empty() || id.chars().any(|c| matches!(c, '/' | '\\' | ':' | '*' | '?' | '<' | '>' | '"' | '|')) || id == "." || id == ".." {
         return Err("非法项目 ID".into());
     }
     Ok(id)
@@ -32,13 +32,25 @@ fn write_json(path: &Path, value: &Value) -> Result<(), String> {
 #[tauri::command]
 pub fn save_store(app: AppHandle, data: String) -> Result<(), String> {
     let path = app.path().app_data_dir().map_err(|e| e.to_string())?.join("store.json");
-    if let Some(parent) = path.parent() { fs::create_dir_all(parent).map_err(|e| e.to_string())?; }
-    fs::write(path, data).map_err(|e| e.to_string())
+    atomic_write(&path, data.as_bytes())
 }
 
 #[tauri::command]
 pub fn load_store(app: AppHandle) -> Result<String, String> {
     let path = app.path().app_data_dir().map_err(|e| e.to_string())?.join("store.json");
+    if !path.exists() { return Ok(String::new()); }
+    fs::read_to_string(path).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn save_snapshot(app: AppHandle, data: String) -> Result<(), String> {
+    let path = app.path().app_data_dir().map_err(|e| e.to_string())?.join("store.snap.json");
+    atomic_write(&path, data.as_bytes())
+}
+
+#[tauri::command]
+pub fn load_snapshot(app: AppHandle) -> Result<String, String> {
+    let path = app.path().app_data_dir().map_err(|e| e.to_string())?.join("store.snap.json");
     if !path.exists() { return Ok(String::new()); }
     fs::read_to_string(path).map_err(|e| e.to_string())
 }
@@ -149,16 +161,4 @@ pub fn search_project(app: AppHandle, project_id: String, query: String) -> Resu
         Ok(())
     }
     walk(&root, &query, &mut hits)?; Ok(hits)
-}
-
-#[tauri::command]
-pub fn export_project(app: AppHandle, project_id: String, destination: String) -> Result<String, String> {
-    let id = safe_id(&project_id)?; let from = data_root(&app)?.join(id);
-    let dest = PathBuf::from(destination); fs::create_dir_all(&dest).map_err(|e| e.to_string())?;
-    fn copy_dir(from: &Path, to: &Path) -> Result<(), String> {
-        fs::create_dir_all(to).map_err(|e| e.to_string())?;
-        for e in fs::read_dir(from).map_err(|e| e.to_string())? { let e=e.map_err(|e|e.to_string())?; let p=e.path(); let d=to.join(e.file_name()); if p.is_dir(){copy_dir(&p,&d)?}else{fs::copy(&p,&d).map_err(|e|e.to_string())?;} }
-        Ok(())
-    }
-    copy_dir(&from, &dest.join(id))?; Ok(dest.to_string_lossy().to_string())
 }

@@ -91,6 +91,8 @@ window.APP.store = (function () {
     D.stats.chapterWords = D.stats.chapterWords || {};
     return D.stats.chapterWords;
   }
+  function chapterStatKey(projectId, beatId) { return String(projectId || '') + ':' + String(beatId || ''); }
+  function readChapterStat(cw, pid, beatId) { return cw[chapterStatKey(pid, beatId)] || cw[beatId]; }
   function chapterCalc(b) {
     let words = 0, ai = 0;
     (b.paras || []).forEach(x => {
@@ -109,8 +111,8 @@ window.APP.store = (function () {
     pd.volumes.forEach(v => (v.beats || []).forEach(b => {
       const inMem = cur && cur.projectId === pid && cur.chapterId === b.id && Array.isArray(b.paras) && b.paras.length;
       let c;
-      if (inMem) { c = chapterCalc(b); cw[b.id] = c; }
-      else c = cw[b.id] || { words: 0, ai: 0 };
+      if (inMem) { c = chapterCalc(b); cw[chapterStatKey(pid, b.id)] = c; }
+      else c = readChapterStat(cw, pid, b.id) || { words: 0, ai: 0 };
       words += c.words; ai += c.ai;
     }));
     return { words, ai };
@@ -197,8 +199,8 @@ window.APP.store = (function () {
       (pd.volumes || []).forEach(v => (v.beats || []).forEach(b => {
         const inMem = cur && cur.chapterId === b.id && Array.isArray(b.paras) && b.paras.length;
         let c;
-        if (inMem) { c = chapterCalc(b); cw[b.id] = c; }
-        else c = cw[b.id];
+        if (inMem) { c = chapterCalc(b); cw[chapterStatKey(pid, b.id)] = c; }
+        else c = readChapterStat(cw, pid, b.id);
         if (c) { total += c.words; ai += c.ai; }
       }));
     });
@@ -239,33 +241,31 @@ window.APP.store = (function () {
     useProject((D.current && D.current.projectId) || (D.projects[0] && D.projects[0].id));
     /* 崩溃恢复（§12-2）：dirty 标记残留 = 上次写入未完成 */
     try { if (localStorage.getItem(DIRTY_KEY)) D.snapAvailable = true; } catch (e) { /* 忽略 */ }
-    /* 章节懒加载迁移（§12-1 P0）：正文拆成每章 bundle，主存储瘦身 */
-    migrateBundles().then(migrated => {
-      if (migrated) {
-        const curP = currentProject();
-        if (curP && window.DATA.current && window.DATA.current.chapterId) {
-          /* 迁移后当前章正文已被保留在内存，无需重载；但统计以缓存为准已由 syncStats 处理 */
-        }
-      }
-    });
-    save();
-    /* 桌面端：本地缓存为空时从磁盘恢复 */
+    /* 章节懒加载迁移与持久化必须在桌面磁盘恢复之后执行，避免种子数据覆盖真实存档 */
+    const finishInit = async () => {
+      await migrateBundles();
+      save();
+      readyCbs.splice(0).forEach(cb => { try { cb(); } catch (e) { /* 单页渲染失败不阻塞 */ } });
+    };
     if (isDesktop() && !hasLocal) {
-      invoke('load_store').then(s => {
-        if (!s) return;
-        try {
-          const obj = JSON.parse(s);
-          Object.keys(D).forEach(k => { if (obj[k] !== undefined) D[k] = obj[k]; });
-          D.projects.forEach(p => projectData(p.id));
-          useProject((D.current && D.current.projectId) || (D.projects[0] && D.projects[0].id));
-          migrateBundles();
-          readyCbs.splice(0).forEach(cb => { try { cb(); } catch (e) { /* 单页渲染失败不阻塞 */ } });
-        } catch (e) { /* 磁盘存档损坏则忽略 */ }
-      }).catch(() => {});
+      invoke('load_store').then(async s => {
+        if (s) {
+          try {
+            const obj = JSON.parse(s);
+            Object.keys(D).forEach(k => { if (obj[k] !== undefined) D[k] = obj[k]; });
+            D.projects.forEach(p => projectData(p.id));
+            useProject((D.current && D.current.projectId) || (D.projects[0] && D.projects[0].id));
+          } catch (e) { /* 磁盘存档损坏则保留种子数据 */ }
+        }
+        await finishInit();
+      }).catch(() => finishInit());
+    } else {
+      finishInit();
     }
     return D;
   }
   function save() {
+    let persisted = false;
     try {
       const prevTotal = totalWords();
       syncStats();
@@ -277,9 +277,14 @@ window.APP.store = (function () {
       setDirty();
       localStorage.setItem(KEY, serialize());
       clearDirty();
-    } catch (e) { /* 存储满或隐私模式：静默失败 */ }
+      persisted = true;
+    } catch (e) {
+      /* 存储满或隐私模式：保留 dirty 标记并明确告知用户 */
+      try { window.APP.toast('本地存储空间不足，当前改动尚未保存，请先导出备份或删除图片', 'warn'); } catch (_) { /* 页面尚未就绪 */ }
+    }
     syncDisk();
     autoSnapshot();
+    return persisted;
   }
 
   /* ---------- 崩溃恢复自动快照（§12-2） ---------- */
@@ -303,7 +308,11 @@ window.APP.store = (function () {
       try { s = localStorage.getItem(SNAP_KEY); } catch (e) { s = null; }
     }
     if (!s) throw new Error('没有可用的自动快照');
-    const obj = JSON.parse(s);
+    let obj;
+    try { obj = JSON.parse(s); } catch (e) {
+      try { localStorage.removeItem(SNAP_KEY); } catch (_) { /* ignore */ }
+      throw new Error('自动快照已损坏，请使用备份恢复');
+    }
     if (!obj || !Array.isArray(obj.projects)) throw new Error('快照文件结构不正确');
     Object.keys(window.DATA).forEach(k => { if (obj[k] !== undefined) window.DATA[k] = obj[k]; });
     window.DATA.projects.forEach(p => projectData(p.id));
@@ -325,12 +334,12 @@ window.APP.store = (function () {
     Object.entries(D.projectData || {}).forEach(([pid, pd]) => {
       (pd.volumes || []).forEach(v => (v.beats || []).forEach(b => {
         if (!Array.isArray(b.paras) || !b.paras.length) {
-          if (b.paras && b.paras.length === 0) { cw[b.id] = { words: 0, ai: 0 }; }
+          if (b.paras && b.paras.length === 0) { cw[chapterStatKey(pid, b.id)] = { words: 0, ai: 0 }; }
           return;
         }
         const isCurrent = cur && cur.projectId === pid && cur.chapterId === b.id;
         const bundle = chapterBundle(b);
-        cw[b.id] = chapterCalc(b);
+        cw[chapterStatKey(pid, b.id)] = chapterCalc(b);
         tasks.push(Promise.resolve(saveChapterBundle(pid, v.id, b.id, bundle)).catch(() => {}));
         if (!isCurrent) b.paras = [];   // 只保留当前章节正文在内存
         moved++;
@@ -374,7 +383,10 @@ window.APP.store = (function () {
       /* 清理该作品的章节字数缓存 */
       const cw = window.DATA.stats && window.DATA.stats.chapterWords;
       if (cw) {
-        window.DATA.projectData[id].volumes.forEach(v => (v.beats || []).forEach(b => delete cw[b.id]));
+        const pd = window.DATA.projectData[id];
+        if (pd && Array.isArray(pd.volumes)) {
+          pd.volumes.forEach(v => (v.beats || []).forEach(b => delete cw[chapterStatKey(id, b.id)]));
+        }
       }
       delete window.DATA.projectData[id];
     }
@@ -425,7 +437,7 @@ window.APP.store = (function () {
     const b = findBeat(volumeId, beatId);
     if (!b) return;
     Object.assign(b, patch);
-    if (patch.paras !== undefined) statsEnsure()[beatId] = chapterCalc(b);
+    if (patch.paras !== undefined) statsEnsure()[chapterStatKey((_current() || {}).projectId, beatId)] = chapterCalc(b);
     const vol = window.DATA.volumes.find(v => v.id === volumeId);
     if (vol) {
       vol.chapters = vol.beats.length;
@@ -440,8 +452,8 @@ window.APP.store = (function () {
     vol.chapters = vol.beats.length;
     vol.done = vol.beats.filter(x => x.status === 'done').length;
     vol.beats.forEach((b, i) => { b.no = String(i + 1).padStart(2, '0'); });
-    if (window.DATA.stats && window.DATA.stats.chapterWords) delete window.DATA.stats.chapterWords[beatId];
     const c = _current();
+    if (window.DATA.stats && window.DATA.stats.chapterWords) delete window.DATA.stats.chapterWords[chapterStatKey(c && c.projectId, beatId)];
     if (c && c.chapterId === beatId) { c.volumeId = ''; c.chapterId = ''; c.chapterTitle = ''; }
     save();
   }
@@ -523,7 +535,7 @@ window.APP.store = (function () {
     const b = findBeat(volumeId, beatId);
     if (!b) return;
     b.paras = paras;
-    statsEnsure()[beatId] = chapterCalc(b);
+    statsEnsure()[chapterStatKey((_current() || {}).projectId, beatId)] = chapterCalc(b);
     const words = paras.reduce((s, p) => s + (p.text || '').length, 0);
     if (_current() && _current().chapterId === beatId) _current().chapterWords = words;
     save();
@@ -714,10 +726,13 @@ window.APP.store = (function () {
       if (!target) { target = { group: g.group, items: [] }; window.DATA.templates.push(target); }
       g.items.forEach(t => {
         if (!t || !t.name) return;
-        const exists = target.items.some(x => x.id === t.id);
+        const normalized = Object.assign({ vars: [], params: { temp: 0.8, max: 2000 }, desc: '' }, t);
+        normalized.vars = Array.isArray(normalized.vars) ? normalized.vars : [];
+        normalized.params = Object.assign({ temp: 0.8, max: 2000 }, normalized.params || {});
+        const exists = target.items.some(x => x.id === normalized.id);
         target.items.push(exists
-          ? Object.assign({}, t, { id: 'tp' + Date.now().toString(36) + Math.floor(Math.random() * 1e4) })
-          : t);
+          ? Object.assign({}, normalized, { id: 'tp' + Date.now().toString(36) + Math.floor(Math.random() * 1e4) })
+          : normalized);
         count++;
       });
     });

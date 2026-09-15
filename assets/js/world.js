@@ -528,7 +528,7 @@ ${c.name}（${c.role}）：${c.brief}　性格：${(c.traits || []).join('、')}
     APP.toast('AI 正在生成设定，即将进入待确认队列…', '');
     try {
       const p = APP.store.currentProject() || { title: '新书', genre: '未分类' };
-      const what = { chars: '人物', loc: '地点', item: '物品', fs: '伏笔' }[tab] || '设定';
+      const what = { chars: '人物', loc: '地点', item: '物品', fs: '伏笔', timeline: '时间线事件' }[tab] || '设定';
       const res = await APP.ai.complete({
         parts: [], user: `为${p.genre || ''}小说《${p.title}》生成 4 个新的${what}设定条目，逐条输出，每一条写成一行「名称/标题 —— 描述」。风格要贴合现有的细腻治愈、马卡龙清新世界观。`,
         system: '你是世界观与设定策划。输出简洁条目。'
@@ -546,6 +546,7 @@ ${c.name}（${c.role}）：${c.brief}　性格：${(c.traits || []).join('、')}
         }
         else if (tab === 'loc') { const l = APP.store.addLocation({ name, type: '新地点', desc, tags: [] }); selected = l.id; }
         else if (tab === 'item') { const i = APP.store.addItem({ name, type: '新道具', owner: '', desc }); selected = i.id; }
+        else if (tab === 'timeline') { const t = APP.store.addTimeline({ t: name, e: desc }); selected = t.id; }
         else { const f = APP.store.addForeshadow({ text: desc || name, where: '待定', note: '' }); selected = f.id; }
         added++;
       });
